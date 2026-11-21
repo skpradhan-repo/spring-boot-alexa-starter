@@ -107,7 +107,9 @@ curl -X POST http://127.0.0.1:8080/api/knowledge/ask -H "Content-Type: applicati
 
 The reply has `answer`, `grounded` and `sources` (document, version, match score, excerpt). Only the caller's access group is searched,
 and only the latest version of each document. If nothing is similar enough, the model is not called and the answer is
-"I could not find this in the uploaded documents." (`grounded: false`). On Windows PowerShell write the JSON to a file and use
+"I could not find this in the uploaded documents." (`grounded: false`). That sentence is returned in the language of the question
+for English, Hindi and Odia (chosen from the question's script; any other language gets the English sentence). The Hindi and Odia
+wording has not been reviewed by a native speaker. On Windows PowerShell write the JSON to a file and use
 `--data-binary "@file.json"`, because PowerShell mangles quotes and non-English text passed inline.
 
 Ready-made English, Hindi and Odia test files, with expected results and a checklist, are in [`samples/`](samples/README.md).

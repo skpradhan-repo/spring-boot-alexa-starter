@@ -132,6 +132,55 @@ class KnowledgeAnswerServiceTest {
     }
 
     @Test
+    void notFoundIsGivenInTheLanguageOfTheQuestion() {
+        add("leave.txt", "hr", "Annual leave is 24 days per year.");
+
+        // Odia and Hindi questions: no passage is close enough, so the model is not called.
+        var odia = service().ask("ଆଜି ପାଣିପାଗ କିପରି?", "hr");
+        var hindi = service().ask("आज मौसम कैसा है?", "hr");
+
+        assertThat(odia.answer()).isEqualTo(KnowledgeAnswerService.NOT_FOUND_BY_LANGUAGE.get("or"))
+                .isNotEqualTo(KnowledgeAnswerService.NOT_FOUND);
+        assertThat(hindi.answer()).isEqualTo(KnowledgeAnswerService.NOT_FOUND_BY_LANGUAGE.get("hi"));
+        assertThat(odia.grounded()).isFalse();
+        assertThat(gateway.prompts).isEmpty();
+    }
+
+    @Test
+    void aLanguageWithoutATranslationGetsTheEnglishSentence() {
+        add("leave.txt", "hr", "Annual leave is 24 days per year.");
+
+        var tamil = service().ask("இன்று வானிலை எப்படி?", "hr");
+
+        assertThat(tamil.answer()).isEqualTo(KnowledgeAnswerService.NOT_FOUND);
+    }
+
+    @Test
+    void theModelIsToldTheExactNotFoundSentenceForTheQuestionLanguage() {
+        add("leave.txt", "hr", "Annual leave is 24 days per year.");
+
+        service().ask("ବାର୍ଷିକ ଛୁଟି ଦିନ ସଂଖ୍ୟା କେତେ leave?", "hr");
+        service().ask("How much leave do I get?", "hr");
+
+        assertThat(gateway.prompts.get(0).system())
+                .contains("reply exactly: " + KnowledgeAnswerService.NOT_FOUND_BY_LANGUAGE.get("or"));
+        assertThat(gateway.prompts.get(1).system())
+                .contains("reply exactly: " + KnowledgeAnswerService.NOT_FOUND)
+                .doesNotContain("%s");
+    }
+
+    @Test
+    void anEmptyModelAnswerToAnOdiaQuestionIsReportedInOdia() {
+        add("leave.txt", "hr", "Annual leave is 24 days per year.");
+        gateway.reply = " ";
+
+        var answer = service().ask("ବାର୍ଷିକ ଛୁଟି ଦିନ ସଂଖ୍ୟା କେତେ leave?", "hr");
+
+        assertThat(answer.answer()).isEqualTo(KnowledgeAnswerService.NOT_FOUND_BY_LANGUAGE.get("or"));
+        assertThat(answer.grounded()).isFalse();
+    }
+
+    @Test
     void neverSearchesAnotherAccessGroup() {
         add("salary.txt", "finance", "Leave encashment is paid at basic salary.");
 
