@@ -96,12 +96,15 @@ h3 { font-size: 12px; color: var(--muted); margin: 14px 0 6px; text-transform: u
     align-items: start;
 }
 
-body[data-mode="simple"] .layout { max-width: 640px; }
-body[data-mode="developer"] .layout { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
-body[data-mode="simple"] .dev-only { display: none; }
+body[data-mode="simple"] .layout,
+body:not([data-tab="alexa"]) .layout { max-width: 640px; }
+body[data-mode="developer"][data-tab="alexa"] .layout { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+/* The request builder and inspectors only make sense for the Alexa skill tab. */
+body[data-mode="simple"] .dev-only,
+body:not([data-tab="alexa"]) .dev-only { display: none; }
 
 @media (max-width: 960px) {
-    body[data-mode="developer"] .layout { grid-template-columns: minmax(0, 1fr); }
+    body[data-mode="developer"][data-tab="alexa"] .layout { grid-template-columns: minmax(0, 1fr); }
 }
 
 .dev-column, .main-column { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -292,10 +295,39 @@ input[type="file"] { width: 100%; color: var(--text); font: inherit; font-size: 
 .doc-list .doc-detail { color: var(--muted); margin-top: 4px; }
 .doc-list code { font-size: 11px; }
 
-.ask-result { margin-top: 8px; }
-.ask-answer { background: #1d3a5f; border-radius: 12px; padding: 12px; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
-.ask-result h3 { margin: 12px 0 6px; font-size: 13px; color: var(--muted); }
-.ask-result[hidden] { display: none; }
+/* ---------- tabs and voice settings ---------- */
+
+.tabs-bar {
+    max-width: 1280px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    flex-wrap: wrap;
+}
+
+body[data-mode="simple"] .tabs-bar,
+body:not([data-tab="alexa"]) .tabs-bar { max-width: 640px; }
+
+.tabs {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3px;
+    flex-wrap: wrap;
+}
+
+.tab { background: transparent; color: var(--muted); padding: 8px 16px; }
+.tab[aria-selected="true"] { background: var(--accent); color: white; }
+
+.voice-settings { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.voice-settings label { color: var(--muted); font-size: 13px; }
+.voice-settings select { width: auto; padding: 6px 10px; }
+
+.tab-pane { display: flex; flex-direction: column; gap: 16px; }
+.tab-pane[hidden] { display: none; }
 
 /* ---------- errors ---------- */
 

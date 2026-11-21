@@ -4,18 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alexa Skill Simulator</title>
+    <title>Local AI Assistant</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body data-mode="simple">
+<body data-mode="simple" data-tab="alexa">
 
     <header class="topbar">
         <div class="brand">
             <div class="logo" aria-hidden="true">A</div>
             <div>
-                <h1>Alexa Skill Simulator</h1>
-                <p>Test your skill locally, without an Echo device</p>
+                <h1>Local AI Assistant</h1>
+                <p>Alexa skill, general questions and your own documents - by voice or text, all on this machine</p>
             </div>
         </div>
 
@@ -33,14 +33,31 @@
         <ul id="errorList"></ul>
     </div>
 
+    <nav class="tabs-bar" aria-label="Assistant">
+        <div class="tabs" role="tablist" aria-label="What do you want to do?">
+            <button type="button" role="tab" id="tabAlexa" class="tab" aria-selected="true" aria-controls="paneAlexa" data-tab="alexa">Alexa skill</button>
+            <button type="button" role="tab" id="tabChat" class="tab" aria-selected="false" aria-controls="paneChat" data-tab="chat" tabindex="-1">Ask anything</button>
+            <button type="button" role="tab" id="tabDocs" class="tab" aria-selected="false" aria-controls="paneDocs" data-tab="docs" tabindex="-1">Ask my documents</button>
+        </div>
+
+        <div class="voice-settings">
+            <label for="voiceLang">Voice language</label>
+            <select id="voiceLang"></select>
+            <label class="checkbox">
+                <input type="checkbox" id="speakReplies" checked> Speak replies
+            </label>
+        </div>
+    </nav>
+
     <main class="layout">
 
         <div class="main-column">
 
-        <!-- ================= Conversation (both modes) ================= -->
+        <!-- ================= Tab 1: Alexa skill (both modes) ================= -->
+        <div id="paneAlexa" role="tabpanel" aria-labelledby="tabAlexa" class="tab-pane">
         <section class="panel chat" aria-labelledby="chatTitle">
             <div class="panel-header">
-                <h2 id="chatTitle">Conversation</h2>
+                <h2 id="chatTitle">Alexa skill conversation</h2>
                 <div class="panel-actions">
                     <button type="button" id="newSession" class="secondary" title="End the Alexa session; the conversation stays">New session</button>
                     <button type="button" id="clearConversation" class="secondary" title="Clear everything and start fresh">Clear</button>
@@ -62,37 +79,93 @@
             <div class="voice-row">
                 <button type="button" id="micButton" class="success">Start listening</button>
                 <button type="button" id="stopMicButton" class="secondary" disabled>Stop</button>
-                <label class="checkbox">
-                    <input type="checkbox" id="speakReplies" checked> Speak replies
-                </label>
             </div>
         </section>
+        </div>
 
-        <!-- ================= Ask your documents (both modes) ================= -->
-        <section class="panel ask-panel" aria-labelledby="askTitle">
+        <!-- ================= Tab 2: Ask anything (local model, no documents) ================= -->
+        <div id="paneChat" role="tabpanel" aria-labelledby="tabChat" class="tab-pane" hidden>
+        <section class="panel chat" aria-labelledby="generalTitle">
             <div class="panel-header">
-                <h2 id="askTitle">Ask your documents</h2>
+                <h2 id="generalTitle">Ask anything</h2>
+                <div class="panel-actions">
+                    <button type="button" id="generalClear" class="secondary">Clear</button>
+                </div>
+            </div>
+
+            <div id="generalLog" class="history" role="log" aria-live="polite" aria-label="Questions and answers">
+                <p class="empty">Ask any question, for example <em>"What is a leave policy?"</em>. The local model answers from its own knowledge, not from your documents.</p>
+            </div>
+
+            <p id="generalStatus" class="status" role="status"></p>
+
+            <div class="input-row">
+                <label for="generalInput" class="visually-hidden">Question</label>
+                <input type="text" id="generalInput" placeholder="Type or speak a question..." autocomplete="off">
+                <button type="button" id="generalSend" class="primary">Ask</button>
+            </div>
+
+            <div class="voice-row">
+                <button type="button" id="generalMic" class="success">Start listening</button>
+                <button type="button" id="generalStop" class="secondary" disabled>Stop</button>
+            </div>
+            <p class="hint">Each question is answered on its own; the model does not remember earlier questions. Small local models can be wrong, so check important answers.</p>
+        </section>
+        </div>
+
+        <!-- ================= Tab 3: Ask my documents ================= -->
+        <div id="paneDocs" role="tabpanel" aria-labelledby="tabDocs" class="tab-pane" hidden>
+
+        <section class="panel" aria-labelledby="documentsTitle">
+            <div class="panel-header">
+                <h2 id="documentsTitle">1. Upload a document</h2>
             </div>
 
             <div class="field-grid">
-                <label for="askGroup">Access group</label>
-                <input type="text" id="askGroup" value="public" autocomplete="off" spellcheck="false">
+                <label for="docFile">File</label>
+                <input type="file" id="docFile" accept=".pdf,.docx,.txt,.html,.md">
+
+                <label for="docGroup">Access group</label>
+                <input type="text" id="docGroup" value="public" autocomplete="off" spellcheck="false">
             </div>
+            <p class="hint">PDF, DOCX, TXT, HTML or Markdown, up to 20 MB, in any language the embedding model understands.
+                Questions below only see documents in this access group. Needs the app to run with the <code>knowledge</code> profile.</p>
+
+            <div class="button-row">
+                <button type="button" id="docUpload" class="primary">Upload and index</button>
+            </div>
+
+            <p id="docStatus" class="status" role="status" aria-live="polite"></p>
+            <ul id="docList" class="doc-list"></ul>
+        </section>
+
+        <section class="panel chat" aria-labelledby="askTitle">
+            <div class="panel-header">
+                <h2 id="askTitle">2. Ask about your documents</h2>
+                <div class="panel-actions">
+                    <button type="button" id="askClear" class="secondary">Clear</button>
+                </div>
+            </div>
+
+            <div id="askLog" class="history" role="log" aria-live="polite" aria-label="Questions and answers about your documents">
+                <p class="empty">Upload a document, then ask about it by voice or text. Answers come only from your documents and show their sources.</p>
+            </div>
+
+            <p id="askStatus" class="status" role="status"></p>
 
             <div class="input-row">
-                <label for="askInput" class="visually-hidden">Question</label>
-                <input type="text" id="askInput" placeholder="Ask about an uploaded document..." autocomplete="off">
+                <label for="askInput" class="visually-hidden">Question about your documents</label>
+                <input type="text" id="askInput" placeholder="Type or speak a question about your documents..." autocomplete="off">
                 <button type="button" id="askButton" class="primary">Ask</button>
             </div>
-            <p class="hint">Answers come only from documents uploaded to this access group. English, Hindi and Odia questions work.</p>
 
-            <p id="askStatus" class="status" role="status" aria-live="polite"></p>
-            <div id="askResult" class="ask-result" hidden>
-                <p id="askAnswer" class="ask-answer"></p>
-                <h3>Sources</h3>
-                <ul id="askSources" class="doc-list"></ul>
+            <div class="voice-row">
+                <button type="button" id="askMic" class="success">Start listening</button>
+                <button type="button" id="askStop" class="secondary" disabled>Stop</button>
             </div>
+            <p class="hint">Set the voice language above to the language you will speak. The answer is read aloud in the language it is written in.</p>
         </section>
+        </div>
 
         </div>
 
@@ -151,29 +224,6 @@
                 <pre id="rawRequest" class="code" tabindex="0">No request sent yet.</pre>
                 <h3>Response</h3>
                 <pre id="rawResponse" class="code" tabindex="0">No response yet.</pre>
-            </section>
-
-            <section class="panel" aria-labelledby="documentsTitle">
-                <div class="panel-header">
-                    <h2 id="documentsTitle">Knowledge documents</h2>
-                </div>
-
-                <div class="field-grid">
-                    <label for="docFile">File</label>
-                    <input type="file" id="docFile" accept=".pdf,.docx,.txt,.html,.md">
-
-                    <label for="docGroup">Access group</label>
-                    <input type="text" id="docGroup" value="public" autocomplete="off" spellcheck="false">
-                </div>
-                <p class="hint">PDF, DOCX, TXT, HTML or Markdown, up to 20 MB. English, Hindi and Odia are supported.
-                    Needs the app to run with the <code>knowledge</code> profile.</p>
-
-                <div class="button-row">
-                    <button type="button" id="docUpload" class="primary">Upload and index</button>
-                </div>
-
-                <p id="docStatus" class="status" role="status" aria-live="polite"></p>
-                <ul id="docList" class="doc-list"></ul>
             </section>
 
             <section class="panel" aria-labelledby="sessionTitle">

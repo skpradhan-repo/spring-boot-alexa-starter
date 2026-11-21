@@ -4,13 +4,11 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
 ## Features
 * **Spring Boot webhook (`POST /alexa`):** parses raw Alexa JSON, validates and verifies it, then routes it through ASK `RequestHandler` beans.
 * **Skill coverage:** `LaunchRequest`, `HelloWorldIntent`, `AMAZON.HelpIntent`, `AMAZON.StopIntent`, `AMAZON.CancelIntent`, `AMAZON.FallbackIntent`, `SessionEndedRequest`, and a multi-turn `OrderDrinkIntent` (two slots, entity resolutions, `Dialog.ElicitSlot`, reprompts, cards, SSML, session attributes).
-* **Browser simulator:**
-  * Intent selector, request builder with slot editing, and a raw JSON editor.
-  * Conversation history, request/response inspector, session inspector and error panel.
-  * **Knowledge documents panel** (Developer Mode): upload a file, pick an access group, and watch it go `PENDING` -> `INDEXED` (or `FAILED` with the reason).
-  * **Ask your documents panel** (both modes): ask a question and get an answer grounded in the uploaded documents, with the source passages shown.
-  * Voice start/stop (Web Speech API, Chrome or Edge) and optional spoken replies.
-  * New session / clear conversation.
+* **Browser UI with three tabs, each usable by voice or by typing:**
+  * **Alexa skill:** the original simulator. Intent selector, request builder with slot editing, raw JSON editor, request/response and session inspectors (Developer Mode), new session / clear.
+  * **Ask anything:** a general question to the local model, answered from its own knowledge (`POST /api/chat`).
+  * **Ask my documents:** upload a file to an access group, watch it go `PENDING` -> `INDEXED` (or `FAILED` with the reason), then ask about it; answers come only from your documents and show their sources.
+  * **Voice:** one microphone per tab, a shared **Voice language** selector (English, Hindi, Odia, Bengali, Tamil, Telugu, Kannada, Malayalam, Gujarati, Marathi, Punjabi) and a **Speak replies** switch. Replies are read aloud in the language of their own script. Uses the browser Web Speech API (Chrome or Edge).
   * **Simple Mode** vs **Developer Mode** toggle (persisted in `localStorage`).
 * **Local chat model:** `POST /api/chat` and `POST /api/chat/stream` (Server-Sent Events) talk to Ollama through a resilient `ChatGateway` (concurrency limit, timeout, circuit breaker). The Alexa webhook never depends on the model.
 * **Secure by default:** signature, timestamp and skill-id verification are on unless the `local` profile is active. The server binds to `127.0.0.1`. User text is escaped in SSML, and clients only receive generic errors.
@@ -32,7 +30,7 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
 4. **Run the tests:**
    ```bash
    ./mvnw test
-   node --test src/test/js/simulator.test.mjs src/test/js/documents.test.mjs
+   node --test src/test/js/simulator.test.mjs src/test/js/documents.test.mjs src/test/js/assistant.test.mjs
    ```
 
 Use the online `./mvnw`: an offline build (`-o`) fails unless the ASK servlet jar is already in the local Maven cache.
@@ -90,15 +88,17 @@ curl "http://127.0.0.1:8080/api/documents/<id>?access_group=hr"                 
 Accepted: PDF, DOCX, TXT, HTML and Markdown up to 20 MB; the content must match the extension. `access_group` defaults to
 `public` when omitted. Re-uploading identical bytes
 returns `200` with `"duplicate": true`. Changed content under the same name becomes the next version. Documents are only
-visible within their `access_group` (a stand-in for real identity until JWT lands). English, Hindi and Odia are supported.
+visible within their `access_group` (a stand-in for real identity until JWT lands). Any language the `bge-m3` embedding model
+understands can be uploaded and searched; English, Hindi and Odia are the ones tested with sample files.
 Without the `knowledge` profile none of this is active and the simulator and chat need no database.
 
-You can also upload from the browser: open `http://localhost:8080/`, switch to **Developer** mode and use the **Knowledge documents** panel.
+You can also upload from the browser: open `http://localhost:8080/` and use the **Ask my documents** tab (both modes).
 
 ### Asking questions about your documents
 
-In the browser, use the **Ask your documents** panel (visible in both modes): enter the access group the files were uploaded to,
-type a question and press **Ask**. Answers take about 2-8 seconds on a CPU-only machine. Or call the API:
+In the browser, open the **Ask my documents** tab. Upload a file, then type a question, or press **Start listening** and speak it.
+The access group is the one in the upload form. Set **Voice language** to the language you will speak. Answers take about 2-8
+seconds on a CPU-only machine. Or call the API:
 
 ```bash
 curl -X POST http://127.0.0.1:8080/api/knowledge/ask -H "Content-Type: application/json" \
@@ -125,9 +125,20 @@ If Ollama is down, the Alexa intents keep working, chat returns `503` with `Retr
 
 1. Pick an intent from the selector, or type text and press **Send**.
 2. Say or type "order a latte". The skill asks for the missing size, and your next reply fills it. The **Session** inspector shows the attributes carrying over (for example `ordersPlaced`).
-3. Switch to **Developer Mode** for the JSON editor, request builder, and request/response inspector. Edit a slot or the raw JSON and resend.
+3. Switch to **Developer Mode** for the JSON editor, request builder, and request/response inspector. Edit a slot or the raw JSON and resend. These tools appear on the **Alexa skill** tab only.
 4. **New session** resets the session id and attributes. **Clear** wipes the conversation history.
-5. **Start / Stop** control voice input, and the "speak replies" checkbox reads responses aloud.
+
+## Using voice
+
+Every tab has **Start listening** and **Stop**. Speak, and when you stop the question is sent as if you had typed it.
+
+* **Browser:** use Chrome or Edge. Voice input goes through the browser's own speech service, so it needs an internet connection and
+  microphone permission; this is outside the app and free. Without it, typing still works and the page says so.
+* **Voice language:** choose the language you will speak before pressing the microphone. Odia (`or-IN`) recognition is not available in
+  every browser build; if it is not, the page shows "cannot recognise Odia" and you can type or paste the question.
+* **Spoken replies:** the answer is read in the language of its script (Odia, Hindi, Tamil and so on, otherwise English). This needs a
+  matching voice installed in your operating system (Windows: Settings > Time & language > Speech). If there is none, the answer stays
+  on screen and the page says no voice is installed.
 
 ## Calling the webhook directly
 

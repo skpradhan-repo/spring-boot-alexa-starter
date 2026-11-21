@@ -5,6 +5,8 @@
  * @typedef {{ok:boolean,status:number,document:object|null,error:string|null}} DocumentResult
  */
 
+import { callJson, statusMessage } from './http.js';
+
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'txt', 'html', 'md'];
 const ACCESS_GROUP_PATTERN = /^[a-z0-9_-]{1,64}$/;
@@ -95,28 +97,8 @@ export async function askDocuments(question, accessGroup, { url = '/api/knowledg
 }
 
 async function call(request) {
-    let response;
-    try {
-        response = await request();
-    } catch (cause) {
-        return { ok: false, status: 0, document: null, error: `Network error: ${cause.message}` };
-    }
-
-    const text = await response.text();
-    let body = null;
-    try {
-        body = text ? JSON.parse(text) : null;
-    } catch {
-        // not JSON: handled below
-    }
-
-    if (!response.ok) {
-        return { ok: false, status: response.status, document: null, error: errorText(response.status, body) };
-    }
-    if (body === null) {
-        return { ok: false, status: response.status, document: null, error: 'The server reply was not valid JSON.' };
-    }
-    return { ok: true, status: response.status, document: body, error: null };
+    const result = await callJson(request, errorText);
+    return { ok: result.ok, status: result.status, document: result.data, error: result.error };
 }
 
 function errorText(status, body) {
@@ -126,13 +108,7 @@ function errorText(status, body) {
     if (status === 404) {
         return 'Document not found in this access group.';
     }
-    if (status === 429) {
-        return 'The server is busy (indexing queue or model is full). Try again in a moment.';
-    }
-    if (status === 503) {
-        return 'The model is not reachable. Check that Ollama is running, then try again.';
-    }
-    return body?.detail ?? `HTTP ${status}`;
+    return statusMessage(status, body);
 }
 
 function defaultSleep(ms) {

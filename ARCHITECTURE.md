@@ -32,7 +32,22 @@ flowchart LR
 | Chat | `chat` | Browser chat API, system prompt, input limits |
 | Model Gateway | `gateway` | `ChatGateway` port, Spring AI adapter, resilience decorator, health |
 | Knowledge | `knowledge`, `db/migration` | Upload API, validation, Tika extraction, chunking, embeddings, documents and chunks in PostgreSQL |
-| Developer portal | `static/` | Simulator UI; its Knowledge documents and Ask your documents panels (`js/documents.js`) call `/api/documents` and `/api/knowledge/ask` |
+| Browser UI | `static/` | Three tabs: Alexa skill (`/alexa`), Ask anything (`js/chat.js` -> `/api/chat`), Ask my documents (`js/documents.js` -> `/api/documents`, `/api/knowledge/ask`). Voice is shared: `js/voice.js` (mic to input), `js/speech.js` (Web Speech API), `js/languages.js` (language and voice selection), `js/http.js` (JSON call helper) |
+
+## Voice
+
+Voice runs entirely in the browser through the Web Speech API, so the server needs nothing extra and no paid service is used. The
+microphone fills the same text box as typing and submits on end of speech, so text is always an equal alternative.
+
+* **Recognition language** comes from the Voice language selector. Chrome and Edge send audio to their vendor's speech service, so voice
+  input needs a network connection even though the model and documents stay local. Languages the browser cannot recognise (Odia is the
+  likely one) report "cannot recognise <language>" and the user types instead.
+* **Spoken replies** pick the language from the reply's own Unicode script (`speechLanguageFor`), then the best installed voice
+  (`pickVoice`). Latin text is always spoken in English, never with a Hindi voice. With no matching voice the reply stays as text and the
+  page says so, rather than being read badly.
+* **Server side** `LanguageDetector` labels each uploaded document from its dominant script (English, Hindi, Odia, Bengali, Tamil, Telugu,
+  Kannada, Malayalam, Gujarati, Punjabi, Arabic, Russian, Chinese, Korean). It cannot separate languages sharing a script, which does not
+  matter for retrieval because `bge-m3` embeds all of them.
 
 ## Knowledge ingestion
 
