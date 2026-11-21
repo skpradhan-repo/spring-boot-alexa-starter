@@ -44,7 +44,7 @@ ollama pull gemma:2b
 ollama pull bge-m3
 ```
 
-Chat works with just that. Start the database only when you need the knowledge schema:
+Chat works with just that. Start the database only when you need the knowledge service (document upload and indexing):
 
 ```bash
 cp .env.example .env                 # then set POSTGRES_PASSWORD
@@ -52,6 +52,18 @@ podman compose up -d postgres        # PostgreSQL + pgvector on 127.0.0.1:5432
 SPRING_PROFILES_ACTIVE=local,knowledge ./mvnw spring-boot:run   # Flyway creates the schema
 podman compose --profile observability up -d   # optional Prometheus + Grafana
 ```
+
+### Uploading documents (knowledge profile)
+
+```bash
+curl -F "file=@leave-policy.pdf" -F "access_group=hr" http://127.0.0.1:8080/api/documents     # 202 + document id, status PENDING
+curl "http://127.0.0.1:8080/api/documents/<id>?access_group=hr"                                # PENDING -> INDEXED (or FAILED + reason)
+```
+
+Accepted: PDF, DOCX, TXT, HTML and Markdown up to 20 MB; the content must match the extension. Re-uploading identical bytes
+returns `200` with `"duplicate": true`. Changed content under the same name becomes the next version. Documents are only
+visible within their `access_group` (a stand-in for real identity until JWT lands). English, Hindi and Odia are supported.
+Without the `knowledge` profile none of this is active and the simulator and chat need no database.
 
 Switch the chat model without code changes: `CHAT_MODEL=qwen3.5:9b`. On this CPU-only machine `gemma:2b` answers in about 1 s to first token, while a 9B model is far too slow for voice (measurements in [ARCHITECTURE.md](ARCHITECTURE.md)).
 

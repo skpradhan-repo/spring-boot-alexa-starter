@@ -18,9 +18,18 @@
 		<ask-sdk.version>2.86.0</ask-sdk.version>
 		<spring-ai.version>2.1.0</spring-ai.version>
 		<resilience4j.version>2.4.0</resilience4j.version>
+		<tika.version>4.2.0</tika.version>
+		<commons-io.version>2.22.0</commons-io.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
+			<!-- ask-sdk-servlet-support drags in commons-io 2.7, which shadows the 2.19+ that Tika, POI and PDFBox
+			     need (NoSuchMethodError at runtime). Pin the latest release for the whole application. -->
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>${commons-io.version}</version>
+			</dependency>
 			<dependency>
 				<groupId>org.springframework.ai</groupId>
 				<artifactId>spring-ai-bom</artifactId>
@@ -61,6 +70,23 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-ollama</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-tika-document-reader</artifactId>
+		</dependency>
+		<!-- Spring AI's Tika reader pins Tika 4.0.0. Declaring these directly makes the latest release win
+		     without importing the Tika BOM, which would also override Boot's Micrometer/Jackson/SLF4J versions. -->
+		<dependency>
+			<groupId>org.apache.tika</groupId>
+			<artifactId>tika-core</artifactId>
+			<version>${tika.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tika</groupId>
+			<artifactId>tika-parsers-standard-package</artifactId>
+			<version>${tika.version}</version>
+			<type>pom</type>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

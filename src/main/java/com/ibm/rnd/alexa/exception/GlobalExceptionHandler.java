@@ -53,6 +53,32 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(ProblemDetail.forStatusAndDetail(status, "The assistant is busy or unavailable, try again shortly"));
     }
 
+    /** Our own validation messages never contain file content, so they can be shown to the uploader. */
+    @ExceptionHandler(UnsupportedDocumentTypeException.class)
+    ResponseEntity<ProblemDetail> handleUnsupportedType(UnsupportedDocumentTypeException e) {
+        log.warn("Document rejected: {}", e.getMessage());
+        return problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidDocumentException.class)
+    ResponseEntity<ProblemDetail> handleInvalidDocument(InvalidDocumentException e) {
+        log.warn("Document rejected: {}", e.getMessage());
+        return problem(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(DocumentNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleDocumentNotFound(DocumentNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Document not found");
+    }
+
+    @ExceptionHandler(IngestionBusyException.class)
+    ResponseEntity<ProblemDetail> handleIngestionBusy(IngestionBusyException e) {
+        log.warn("Ingestion queue full; upload rejected");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, "30")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Too many documents are being processed, try again later"));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception e) {
         log.error("Error processing Alexa request", e);
