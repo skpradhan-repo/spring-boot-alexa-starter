@@ -11,23 +11,11 @@
 	<groupId>com.ibm.rnd.alexa</groupId>
 	<artifactId>alexa-demo</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<name>spring-boot-alexa-starter</name>
+	<description>Local Alexa skill simulator built on Spring Boot and the Alexa Skills Kit Java SDK</description>
 	<properties>
 		<java.version>17</java.version>
+		<ask-sdk.version>2.86.0</ask-sdk.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -35,19 +23,14 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 		<dependency>
-            <groupId>com.amazon.alexa</groupId>
-            <artifactId>ask-sdk-core</artifactId>
-            <version>2.86.0</version>
-        </dependency>
-		<dependency>
 			<groupId>com.amazon.alexa</groupId>
-			<artifactId>ask-sdk</artifactId>
-			<version>2.81.0</version>
+			<artifactId>ask-sdk-core</artifactId>
+			<version>${ask-sdk.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.amazon.alexa</groupId>
 			<artifactId>ask-sdk-servlet-support</artifactId>
-			<version>2.81.0</version>
+			<version>${ask-sdk.version}</version>
 		</dependency>
 
 		<dependency>

@@ -1,68 +1,140 @@
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>My Alexa Assistant</title>
-
+    <title>Alexa Skill Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body data-mode="simple">
 
-    <div class="container">
-
-        <div class="header">
-            <div class="logo">A</div>
-            <h1>My Alexa Assistant</h1>
-            <p>Your personal voice assistant</p>
-        </div>
-
-        <div class="assistant-circle" id="assistantCircle">
-            <span>🎙️</span>
-        </div>
-
-        <p id="status">Click the microphone and start speaking</p>
-
-        <div class="input-section">
-
-            <input
-                type="text"
-                id="messageInput"
-                placeholder="Type or speak something..."
-            />
-
-            <button id="sendButton">
-                Send
-            </button>
-
-        </div>
-
-        <button id="micButton" class="mic-button">
-            🎤 Start Listening
-        </button>
-
-        <div class="result-section">
-
-            <div class="result-card">
-                <h3>You said</h3>
-                <p id="recognizedText">Waiting for your message...</p>
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo" aria-hidden="true">A</div>
+            <div>
+                <h1>Alexa Skill Simulator</h1>
+                <p>Test your skill locally, without an Echo device</p>
             </div>
-
-            <div class="result-card">
-                <h3>Alexa response</h3>
-                <p id="alexaResponse">Waiting for Alexa...</p>
-            </div>
-
         </div>
 
+        <div class="mode-toggle" role="group" aria-label="Simulator mode">
+            <button type="button" id="modeSimple" class="mode-button" aria-pressed="true">Simple</button>
+            <button type="button" id="modeDeveloper" class="mode-button" aria-pressed="false">Developer</button>
+        </div>
+    </header>
+
+    <div id="errorPanel" class="error-panel" role="alert" hidden>
+        <div class="error-header">
+            <strong>Errors</strong>
+            <button type="button" id="dismissErrors" class="link-button">Dismiss all</button>
+        </div>
+        <ul id="errorList"></ul>
     </div>
 
-    <script src="app.js"></script>
+    <main class="layout">
 
+        <!-- ================= Conversation (both modes) ================= -->
+        <section class="panel chat" aria-labelledby="chatTitle">
+            <div class="panel-header">
+                <h2 id="chatTitle">Conversation</h2>
+                <div class="panel-actions">
+                    <button type="button" id="newSession" class="secondary" title="End the Alexa session; the conversation stays">New session</button>
+                    <button type="button" id="clearConversation" class="secondary" title="Clear everything and start fresh">Clear</button>
+                </div>
+            </div>
+
+            <div id="history" class="history" role="log" aria-live="polite" aria-label="Conversation history">
+                <p class="empty">Say or type something, for example <em>"order a large coffee"</em>, <em>"help"</em> or <em>"open"</em>.</p>
+            </div>
+
+            <p id="status" class="status">Click the microphone or type a message</p>
+
+            <div class="input-row">
+                <label for="messageInput" class="visually-hidden">Message</label>
+                <input type="text" id="messageInput" placeholder="Type or speak something..." autocomplete="off">
+                <button type="button" id="sendButton" class="primary">Send</button>
+            </div>
+
+            <div class="voice-row">
+                <button type="button" id="micButton" class="success">Start listening</button>
+                <button type="button" id="stopMicButton" class="secondary" disabled>Stop</button>
+                <label class="checkbox">
+                    <input type="checkbox" id="speakReplies" checked> Speak replies
+                </label>
+            </div>
+        </section>
+
+        <!-- ================= Developer tools ================= -->
+        <div class="dev-column dev-only">
+
+            <section class="panel" aria-labelledby="builderTitle">
+                <div class="panel-header">
+                    <h2 id="builderTitle">Request builder</h2>
+                </div>
+
+                <div class="field-grid">
+                    <label for="requestType">Request type</label>
+                    <select id="requestType"></select>
+
+                    <label for="intentSelect" data-for="IntentRequest">Intent</label>
+                    <select id="intentSelect" data-for="IntentRequest"></select>
+
+                    <label for="endReason" data-for="SessionEndedRequest">Reason</label>
+                    <select id="endReason" data-for="SessionEndedRequest"></select>
+                </div>
+
+                <div id="slotFields" class="field-grid" data-for="IntentRequest"></div>
+
+                <div class="field-grid">
+                    <label for="skillId">Skill ID</label>
+                    <input type="text" id="skillId" autocomplete="off" spellcheck="false">
+                </div>
+
+                <div class="button-row">
+                    <button type="button" id="sendBuilder" class="primary">Send request</button>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="editorTitle">
+                <div class="panel-header">
+                    <h2 id="editorTitle">JSON editor</h2>
+                    <div class="panel-actions">
+                        <button type="button" id="resetEditor" class="secondary">Reset from builder</button>
+                    </div>
+                </div>
+                <label for="jsonEditor" class="visually-hidden">Alexa request JSON</label>
+                <textarea id="jsonEditor" spellcheck="false" rows="14"></textarea>
+                <p class="hint">Sent exactly as written, even if invalid - useful for testing error handling.</p>
+                <div class="button-row">
+                    <button type="button" id="sendJson" class="primary">Send JSON</button>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="inspectorTitle">
+                <div class="panel-header">
+                    <h2 id="inspectorTitle">Request / response inspector</h2>
+                    <span id="exchangeMeta" class="meta"></span>
+                </div>
+                <h3>Request</h3>
+                <pre id="rawRequest" class="code" tabindex="0">No request sent yet.</pre>
+                <h3>Response</h3>
+                <pre id="rawResponse" class="code" tabindex="0">No response yet.</pre>
+            </section>
+
+            <section class="panel" aria-labelledby="sessionTitle">
+                <div class="panel-header">
+                    <h2 id="sessionTitle">Session inspector</h2>
+                </div>
+                <dl id="sessionInfo" class="session-info"></dl>
+                <h3>Session attributes</h3>
+                <pre id="sessionAttributes" class="code" tabindex="0">{}</pre>
+            </section>
+        </div>
+    </main>
+
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>

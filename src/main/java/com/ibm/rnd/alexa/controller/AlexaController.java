@@ -1,24 +1,31 @@
 package com.ibm.rnd.alexa.controller;
 
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import com.ibm.rnd.alexa.service.AlexaRequestService;
 
+/** HTTP adapter for the Alexa webhook. Contains no business logic; it only delegates. */
 @RestController
-@RequestMapping("/api/alexa")
-@CrossOrigin
+@RequestMapping("/alexa")
 public class AlexaController {
 
-    @PostMapping("/say")
-    public Map<String, String> say(
-            @RequestBody Map<String, String> request) {
+    private final AlexaRequestService service;
 
-        String message = request.get("message");
+    public AlexaController(AlexaRequestService service) {
+        this.service = service;
+    }
 
-        System.out.println("Alexa received: " + message);
-
-        return Map.of(
-                "status", "success",
-                "response", "Alexa received: " + message);
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> handle(
+            @RequestBody byte[] rawBody,
+            @RequestHeader(value = "Signature", required = false) String signature,
+            @RequestHeader(value = "SignatureCertChainUrl", required = false) String certChainUrl) {
+        return ResponseEntity.ok(service.handle(rawBody, signature, certChainUrl));
     }
 }
