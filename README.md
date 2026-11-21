@@ -45,14 +45,39 @@ ollama pull gemma:2b
 ollama pull bge-m3
 ```
 
-Chat works with just that. Start the database only when you need the knowledge service (document upload and indexing):
+Chat works with just that. Start the database only when you need the knowledge service (document upload and indexing).
 
-```bash
-cp .env.example .env                 # then set POSTGRES_PASSWORD
-podman compose up -d postgres        # PostgreSQL + pgvector on 127.0.0.1:5432
-SPRING_PROFILES_ACTIVE=local,knowledge ./mvnw spring-boot:run   # Flyway creates the schema
-podman compose --profile observability up -d   # optional Prometheus + Grafana
-```
+### How to run with the knowledge service
+
+The app does **not** read `.env`. Docker/Podman Compose reads it to create the database, and the app takes the same password
+from the `POSTGRES_PASSWORD` environment variable of the terminal that starts it. They must match, or startup fails with
+`password authentication failed for user "assistant"`.
+
+1. Create `.env` once and set `POSTGRES_PASSWORD` to a password of your choice (`.env` is git-ignored; never commit it):
+   ```bash
+   cp .env.example .env
+   ```
+2. Start the database (PostgreSQL + pgvector on `127.0.0.1:5432`):
+   ```bash
+   podman compose up -d postgres
+   ```
+3. Start the app with the `knowledge` profile, in the **same terminal**. PowerShell (Windows), which reads the password from `.env`:
+   ```powershell
+   cd C:\path\to\spring-boot-alexa-starter
+   $env:POSTGRES_PASSWORD = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' }) -replace '^POSTGRES_PASSWORD=','').Trim()
+   $env:SPRING_PROFILES_ACTIVE = "local,knowledge"
+   ./mvnw spring-boot:run
+   ```
+   Bash (macOS/Linux):
+   ```bash
+   set -a; source .env; set +a
+   SPRING_PROFILES_ACTIVE=local,knowledge ./mvnw spring-boot:run
+   ```
+   The log should show `The following 2 profiles are active: "local", "knowledge"` and Flyway creating the schema.
+4. Optional: `podman compose --profile observability up -d` adds Prometheus and Grafana.
+
+Do not change `POSTGRES_PASSWORD` in `.env` after the database has been created: PostgreSQL keeps the original password
+in its data volume. To start over with a new one, run `podman compose down -v` (this deletes the stored documents).
 
 ### Uploading documents (knowledge profile)
 
