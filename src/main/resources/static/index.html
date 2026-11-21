@@ -43,10 +43,15 @@
         <div class="voice-settings">
             <label for="voiceLang">Voice language</label>
             <select id="voiceLang"></select>
+            <label for="voiceEngine">Voice engine</label>
+            <select id="voiceEngine"></select>
+
             <label class="checkbox">
                 <input type="checkbox" id="speakReplies" checked> Speak replies
             </label>
         </div>
+        <p id="engineInfo" class="engine-info" role="status" aria-live="polite"></p>
+
     </nav>
 
     <main class="layout">
@@ -79,6 +84,7 @@
             <div class="voice-row">
                 <button type="button" id="micButton" class="success">Start listening</button>
                 <button type="button" id="stopMicButton" class="secondary" disabled>Stop</button>
+                <button type="button" id="clearMicText" class="secondary">Clear text</button>
             </div>
         </section>
         </div>
@@ -108,6 +114,7 @@
             <div class="voice-row">
                 <button type="button" id="generalMic" class="success">Start listening</button>
                 <button type="button" id="generalStop" class="secondary" disabled>Stop</button>
+                <button type="button" id="generalClearText" class="secondary">Clear text</button>
             </div>
             <p class="hint">Each question is answered on its own; the model does not remember earlier questions. Small local models can be wrong, so check important answers.</p>
         </section>
@@ -162,6 +169,7 @@
             <div class="voice-row">
                 <button type="button" id="askMic" class="success">Start listening</button>
                 <button type="button" id="askStop" class="secondary" disabled>Stop</button>
+                <button type="button" id="askClearText" class="secondary">Clear text</button>
             </div>
             <p class="hint">Set the voice language above to the language you will speak. The answer is read aloud in the language it is written in.</p>
         </section>

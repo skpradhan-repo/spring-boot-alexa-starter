@@ -6,11 +6,36 @@
 import { DEFAULT_VOICE_LANGUAGE, describeSpeechError, languageLabel, pickVoice, speechLanguageFor } from './languages.js';
 
 /**
+ * Splits a Web Speech result event into the text that is still changing (interim) and the text the engine has
+ * settled on (final). Pure, so it can be tested without a browser.
+ *
+ * @param {{resultIndex?:number,results:ArrayLike<ArrayLike<{transcript:string}> & {isFinal:boolean}>}} event
+ * @returns {{interim:string,final:string}}
+ */
+export function readRecognitionEvent(event) {
+    let interim = '';
+    let final = '';
+    for (let i = event.resultIndex ?? 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0]?.transcript ?? '';
+        if (result.isFinal) {
+            final += transcript;
+        } else {
+            interim += transcript;
+        }
+    }
+    return { interim: interim.trim(), final: final.trim() };
+}
+
+/**
  * @param {object} options
  * @param {string|(() => string)} options.lang recognition language, or a function read on every start so a
  *        language selector can change it between questions
+ * @param {(text:string) => void} [options.onInterim] called while the user is still speaking, with the best guess so far
+ * @param {(text:string) => void} [options.onResult] called once with the settled text
+ * @param {(message:string, code:string) => void} [options.onError] readable message and the raw engine error code
  */
-export function createRecognizer({ lang = DEFAULT_VOICE_LANGUAGE, onStart, onResult, onError, onEnd } = {}) {
+export function createRecognizer({ lang = DEFAULT_VOICE_LANGUAGE, onStart, onInterim, onResult, onError, onEnd } = {}) {
     const Recognition = globalThis.SpeechRecognition ?? globalThis.webkitSpeechRecognition;
     if (!Recognition) {
         return { supported: false, start() {}, stop() {} };
@@ -19,10 +44,17 @@ export function createRecognizer({ lang = DEFAULT_VOICE_LANGUAGE, onStart, onRes
     const recognition = new Recognition();
     let current = DEFAULT_VOICE_LANGUAGE;
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.onstart = () => onStart?.();
-    recognition.onresult = (event) => onResult?.(event.results[0][0].transcript);
-    recognition.onerror = (event) => onError?.(describeSpeechError(event.error, current));
+    recognition.onresult = (event) => {
+        const { interim, final } = readRecognitionEvent(event);
+        if (final) {
+            onResult?.(final);
+        } else if (interim) {
+            onInterim?.(interim);
+        }
+    };
+    recognition.onerror = (event) => onError?.(describeSpeechError(event.error, current), event.error);
     recognition.onend = () => onEnd?.();
 
     return {
@@ -33,7 +65,8 @@ export function createRecognizer({ lang = DEFAULT_VOICE_LANGUAGE, onStart, onRes
             try {
                 recognition.start();
             } catch (error) {
-                onError?.(error.message);
+                // start() throws if a session is already running; keep that session instead of creating another.
+                onError?.(error.message, 'start-failed');
             }
         },
         stop() {

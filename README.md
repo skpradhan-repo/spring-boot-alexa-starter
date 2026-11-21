@@ -130,15 +130,68 @@ If Ollama is down, the Alexa intents keep working, chat returns `503` with `Retr
 
 ## Using voice
 
-Every tab has **Start listening** and **Stop**. Speak, and when you stop the question is sent as if you had typed it.
+Every tab has **Start listening**, **Stop** and **Clear text**. Speak, and when you stop the question is sent as if you had typed it.
+Two engines are available, chosen with **Voice engine**. The app never switches between them on its own and never translates: it
+recognises the language you selected, or tells you it cannot.
 
-* **Browser:** use Chrome or Edge. Voice input goes through the browser's own speech service, so it needs an internet connection and
-  microphone permission; this is outside the app and free. Without it, typing still works and the page says so.
-* **Voice language:** choose the language you will speak before pressing the microphone. Odia (`or-IN`) recognition is not available in
-  every browser build; if it is not, the page shows "cannot recognise Odia" and you can type or paste the question.
+* **Browser engine (default):** use Chrome or Edge. Recognition is done by the browser's vendor service, so **your audio leaves this
+  computer** and it needs internet. You see the text live while speaking. Without it, typing still works and the page says so.
+* **Local engine (optional):** recognition runs on this computer with a free model, so audio never leaves it and it works offline. It
+  needs the one-time setup below. You click **Stop** when you have finished speaking (recordings are limited to 25 seconds), then wait a
+  few seconds for the text.
+* **Voice language:** choose the language you will speak before pressing the microphone. Browsers do not say which languages they
+  support, so the list marks a language **works here** only after it has actually produced text in this browser, and **not supported by
+  this engine** after the engine refused it. Odia (`or-IN`) is often refused by browsers; the local engine is the way to get Odia.
 * **Spoken replies:** the answer is read in the language of its script (Odia, Hindi, Tamil and so on, otherwise English). This needs a
   matching voice installed in your operating system (Windows: Settings > Time & language > Speech). If there is none, the answer stays
   on screen and the page says no voice is installed.
+
+### Local speech engine (optional, free, offline)
+
+It uses [AI4Bharat IndicConformer](https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual) (MIT licence), a speech model
+for 22 Indian languages: Assamese, Bengali, Bodo, Dogri, Gujarati, Hindi, Kannada, Konkani, Kashmiri, Maithili, Malayalam, Manipuri,
+Marathi, Nepali, **Odia**, Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu and Urdu. English, Spanish and the other non-Indian
+languages are not covered; use the browser engine for those. (Whisper was not chosen because it has no Odia.)
+
+1. Create a free Hugging Face account, open the model page above, accept its terms, and create a **read** access token
+   (Settings > Access Tokens). The model is gated, so this is required once.
+2. Install and start the service (Python 3.11+; the model downloads on first start. Its size and memory use were not measured here: allow several GB of disk and RAM, and expect several seconds per clip on a CPU):
+
+   ```powershell
+   cd speech-service
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   $env:HF_TOKEN = "<your token>"      # only needed for the first download; do not put it in a file you commit
+   python -m uvicorn app:app --host 127.0.0.1 --port 8090
+   ```
+
+   After the first start the model is cached and the token is no longer needed.
+3. Start the app with the engine enabled: `ASSISTANT_SPEECH_ENABLED=true` (together with your usual profiles).
+4. In the page choose **Voice engine: Local**. The status line says whether the service is ready, still loading, or the model is
+   missing.
+
+Privacy and safety:
+
+* The service and the Spring endpoints listen on `127.0.0.1` only, and `assistant.speech.service-url` is rejected at startup if it is
+  not a loopback address, so recordings cannot be sent elsewhere by configuration.
+* The model repository contains Python code that is run when it loads (`trust_remote_code`). The service pins revision `2a77d305...`
+  so that code cannot change underneath you. That code could not be read before writing this (the repository is gated): read it
+  yourself before first use, and change `SPEECH_MODEL_REVISION` only after reviewing the new code.
+* Recordings are held in memory for one request and not stored. Errors shown to you are generic; details stay in the service log.
+
+**Verification status (be aware):**
+
+| Part | Status |
+|---|---|
+| Browser engine, live text, language support learned from use | Implemented; the logic is unit-tested. Whether a given language works depends on your browser and has not been verified for any language here. |
+| Local engine plumbing (record, 16 kHz WAV, Spring endpoint, service) | Implemented and tested with a fake model. |
+| IndicConformer model call in `speech-service/app.py` | **Not verified against real audio.** The call follows the model's usual convention but was written without access to the gated model files. |
+| Odia, Hindi, Bengali and every other language | **Not tested with real speech.** Do not rely on any language until you have spoken it and checked the text. Suggested first check: Odia, Hindi, Bengali. |
+
+Troubleshooting: *"not enabled"* means the app was started without `ASSISTANT_SPEECH_ENABLED=true`; *"not running"* means the service
+is not listening on port 8090; *"model is not installed"* means the first download failed (check the token and that you accepted the
+terms); *"busy"* means another recording is being recognised, so wait a few seconds.
 
 ## Calling the webhook directly
 
@@ -181,6 +234,7 @@ handler/      RequestHandler beans, SkillReply/ReplyRenderer, shared helpers (Ss
 chat/         Browser chat API (/api/chat, /api/chat/stream)
 gateway/      ChatGateway port, Spring AI adapter, resilience decorator, health
 knowledge/    Document upload API, extraction, chunking, embeddings, JDBC repository (knowledge profile)
+speech/       Optional local speech API (/api/speech), WAV validation, loopback client to speech-service/ (assistant.speech.enabled)
 ```
 
 * **Add a capability:** create a `@Component` extending `ReplyingRequestHandler` (or implementing `RequestHandler`). It is picked up automatically; no other class changes.
@@ -211,5 +265,9 @@ The UI lives in `src/main/resources/static/` (`app.js` is the shell; logic is in
 | `assistant.knowledge.retrieval-top-k` | `3` | Passages given to the model per question. |
 | `assistant.knowledge.retrieval-min-score` | `0.4` | Cosine similarity below which a passage counts as unrelated; if none pass, the model is not called. |
 | `assistant.knowledge.retrieval-context-chars` | `3000` | Upper bound on source text sent to the model. |
+| `assistant.speech.enabled` (`ASSISTANT_SPEECH_ENABLED`) | `false` | Exposes `/api/speech`; needs the Python service in `speech-service/`. |
+| `assistant.speech.service-url` (`ASSISTANT_SPEECH_URL`) | `http://127.0.0.1:8090` | The speech service; must be `127.0.0.1` or `localhost`. |
+| `assistant.speech.max-audio-bytes` | `1000000` | Largest accepted recording (about 30 s of 16 kHz mono audio). |
+| `assistant.speech.timeout` | `60s` | Limit for one recognition; a CPU needs several seconds for a short clip. |
 
 For real Alexa traffic run with `SPRING_PROFILES_ACTIVE=prod` behind a TLS-terminating proxy, and set `ALEXA_SKILL_ID`.

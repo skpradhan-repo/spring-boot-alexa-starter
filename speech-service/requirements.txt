@@ -1,0 +1,12 @@
+# Local speech recognition service (optional). Versions are lower bounds; pin them with your own lock file
+# (pip freeze) once they work on your machine.
+fastapi>=0.120
+uvicorn>=0.38
+numpy>=1.26
+torch>=2.12
+torchaudio>=2.11
+transformers>=5.9
+onnxruntime>=1.32
+huggingface_hub>=1.17
+pytest>=8.4
+httpx>=0.28

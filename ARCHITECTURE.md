@@ -1,6 +1,6 @@
 # Architecture
 
-Status: milestone 1 (Model Gateway), milestone 2 (knowledge ingestion) and milestone 3 (retrieval and grounded answers) complete. JWT identity is next.
+Status: milestone 1 (Model Gateway), milestone 2 (knowledge ingestion) and milestone 3 (retrieval and grounded answers) complete, plus an optional local speech engine (not yet verified with real audio). JWT identity is next.
 
 ## Shape
 
@@ -24,6 +24,8 @@ flowchart LR
     Ask -->|query embedding| Ollama
     Ask -->|access-group scoped cosine search| PG
     Ask --> Gateway
+    Browser -.->|POST /api/speech/transcribe, optional| Speech[Speech API<br/>validate WAV, one at a time]
+    Speech -->|loopback only| Sidecar[(speech-service<br/>IndicConformer, Python)]
 ```
 
 | Module | Package | Owns |
@@ -32,16 +34,28 @@ flowchart LR
 | Chat | `chat` | Browser chat API, system prompt, input limits |
 | Model Gateway | `gateway` | `ChatGateway` port, Spring AI adapter, resilience decorator, health |
 | Knowledge | `knowledge`, `db/migration` | Upload API, validation, Tika extraction, chunking, embeddings, documents and chunks in PostgreSQL |
-| Browser UI | `static/` | Three tabs: Alexa skill (`/alexa`), Ask anything (`js/chat.js` -> `/api/chat`), Ask my documents (`js/documents.js` -> `/api/documents`, `/api/knowledge/ask`). Voice is shared: `js/voice.js` (mic to input), `js/speech.js` (Web Speech API), `js/languages.js` (language and voice selection), `js/http.js` (JSON call helper) |
+| Speech | `speech`, `speech-service/` | Optional local recognition: `/api/speech/status` and `/api/speech/transcribe`, WAV validation, single-flight limit, loopback client to the Python service (off unless `assistant.speech.enabled`) |
+| Browser UI | `static/` | Three tabs: Alexa skill (`/alexa`), Ask anything (`js/chat.js` -> `/api/chat`), Ask my documents (`js/documents.js` -> `/api/documents`, `/api/knowledge/ask`). Voice is shared: `js/voice.js` (mic to input, both engines), `js/speech.js` (Web Speech API), `js/recorder.js` and `js/wav.js` (record, 16 kHz WAV), `js/localSpeech.js` (local engine client), `js/support.js` (what has been seen to work), `js/languages.js` (language and voice selection), `js/http.js` (JSON call helper) |
 
 ## Voice
 
-Voice runs entirely in the browser through the Web Speech API, so the server needs nothing extra and no paid service is used. The
-microphone fills the same text box as typing and submits on end of speech, so text is always an equal alternative.
+Text is always an equal alternative: the microphone fills the same text box as typing and submits on end of speech. Two recognition
+engines sit behind one interface (`bindVoice`), selected by the user and read on every click. There is **no automatic fallback** and no
+translation: a failure is reported with the reason, and nothing is recognised in a language other than the one selected.
 
-* **Recognition language** comes from the Voice language selector. Chrome and Edge send audio to their vendor's speech service, so voice
-  input needs a network connection even though the model and documents stay local. Languages the browser cannot recognise (Odia is the
-  likely one) report "cannot recognise <language>" and the user types instead.
+* **Browser engine** (Web Speech API): free, but Chrome and Edge send the audio to their vendor's speech service, so it needs internet
+  and the audio leaves the machine. Interim results are shown live. Browsers do not list the languages they support and accepting a code
+  proves nothing, so `js/support.js` records, per engine and language in `localStorage`, whether text was actually produced
+  ("works here") or the engine said `language-not-supported`. Everything else stays "not tested". Odia is the likely refusal.
+* **Local engine** (optional): the browser records with `MediaRecorder`, decodes and re-encodes to 16 kHz mono 16-bit WAV (no ffmpeg),
+  and posts it to `/api/speech/transcribe`. `SpeechService` allows one recognition at a time (CPU inference; a second request fails fast
+  with `503`), `WavValidator` accepts only that exact format, and `HttpSpeechRecognizer` forwards it to the Python service. The service
+  URL must be loopback, enforced in `SpeechProperties`, so audio cannot leave the machine through configuration. The Python service
+  (`speech-service/app.py`) loads AI4Bharat IndicConformer (MIT, 22 Indian languages including Odia) in a background thread and reports
+  `loading`, `ready`, `model_missing` or `error`. Whisper was rejected because it has no Odia. The model's repository code is run via
+  `trust_remote_code`, so the revision is pinned.
+* **Verification:** the model call (`IndicConformer.transcribe`) is the one part not verified, because the model is gated and was not
+  available when this was written. All other parts are tested with fakes. No language has been tested with real speech yet.
 * **Spoken replies** pick the language from the reply's own Unicode script (`speechLanguageFor`), then the best installed voice
   (`pickVoice`). Latin text is always spoken in English, never with a Hindi voice. With no matching voice the reply stays as text and the
   page says so, rather than being read badly.

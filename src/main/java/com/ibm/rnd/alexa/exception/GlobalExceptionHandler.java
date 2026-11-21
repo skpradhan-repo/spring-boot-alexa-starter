@@ -79,6 +79,21 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Too many documents are being processed, try again later"));
     }
 
+    @ExceptionHandler(InvalidAudioException.class)
+    ResponseEntity<ProblemDetail> handleInvalidAudio(InvalidAudioException e) {
+        log.warn("Audio rejected: {}", e.getMessage());
+        return problem(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(SpeechUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleSpeechUnavailable(SpeechUnavailableException e) {
+        log.warn("Local speech recognition unavailable: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, "10")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                        "Local speech recognition is not running or not ready"));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception e) {
         log.error("Error processing Alexa request", e);

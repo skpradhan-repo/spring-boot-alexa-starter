@@ -6,23 +6,46 @@
  * depends on the browser and on the voices installed in the operating system.
  */
 
-/** Languages offered for speaking a question. The answer's language is detected from its own script. */
+/**
+ * Languages offered for speaking a question. The answer's language is detected from its own script.
+ *
+ * {@code local} is the language code of the optional local engine (AI4Bharat IndicConformer), or absent when that
+ * engine has no model for the language. Listing a language here says nothing about whether the browser can
+ * recognise it: that is learned from use (see support.js).
+ */
 export const VOICE_LANGUAGES = [
     { code: 'en-IN', label: 'English (India)' },
+    { code: 'hi-IN', label: 'Hindi', local: 'hi' },
+    { code: 'or-IN', label: 'Odia', local: 'or' },
+    { code: 'bn-IN', label: 'Bengali', local: 'bn' },
+    { code: 'ta-IN', label: 'Tamil', local: 'ta' },
+    { code: 'te-IN', label: 'Telugu', local: 'te' },
+    { code: 'kn-IN', label: 'Kannada', local: 'kn' },
+    { code: 'ml-IN', label: 'Malayalam', local: 'ml' },
+    { code: 'gu-IN', label: 'Gujarati', local: 'gu' },
+    { code: 'mr-IN', label: 'Marathi', local: 'mr' },
+    { code: 'pa-IN', label: 'Punjabi', local: 'pa' },
+    { code: 'ur-IN', label: 'Urdu', local: 'ur' },
+    { code: 'sa-IN', label: 'Sanskrit', local: 'sa' },
+    { code: 'as-IN', label: 'Assamese', local: 'as' },
     { code: 'en-US', label: 'English (US)' },
-    { code: 'hi-IN', label: 'Hindi' },
-    { code: 'or-IN', label: 'Odia' },
-    { code: 'bn-IN', label: 'Bengali' },
-    { code: 'ta-IN', label: 'Tamil' },
-    { code: 'te-IN', label: 'Telugu' },
-    { code: 'kn-IN', label: 'Kannada' },
-    { code: 'ml-IN', label: 'Malayalam' },
-    { code: 'gu-IN', label: 'Gujarati' },
-    { code: 'mr-IN', label: 'Marathi' },
-    { code: 'pa-IN', label: 'Punjabi' },
+    { code: 'es-ES', label: 'Spanish' },
+    { code: 'fr-FR', label: 'French' },
+    { code: 'de-DE', label: 'German' },
+    { code: 'ar-SA', label: 'Arabic' },
+    { code: 'zh-CN', label: 'Chinese' },
+    { code: 'ja-JP', label: 'Japanese' },
 ];
 
 export const DEFAULT_VOICE_LANGUAGE = 'en-IN';
+
+/** The local engine's code for a voice language, or null when it has no model for it (English, Spanish, ...). */
+export function localLanguageCode(code) {
+    return VOICE_LANGUAGES.find((language) => language.code === code)?.local ?? null;
+}
+
+/** Languages written in the Latin script: their text is spoken with the selected voice, not with the default. */
+const LATIN_SCRIPT_LANGUAGES = ['en', 'es', 'fr', 'de'];
 
 /** Unicode block (inclusive) to the language spoken when that script dominates a text. */
 const SCRIPT_RANGES = [
@@ -37,6 +60,8 @@ const SCRIPT_RANGES = [
     { from: 0x0D00, to: 0x0D7F, lang: 'ml-IN' },
     { from: 0x0600, to: 0x06FF, lang: 'ar-SA' },
     { from: 0x0400, to: 0x04FF, lang: 'ru-RU' },
+    { from: 0x3040, to: 0x30FF, lang: 'ja-JP' },
+    { from: 0x4E00, to: 0x9FFF, lang: 'zh-CN' },
 ];
 
 /**
@@ -67,7 +92,7 @@ export function speechLanguageFor(text, selected = DEFAULT_VOICE_LANGUAGE) {
     if (best) {
         return best;
     }
-    return selected.startsWith('en') ? selected : DEFAULT_VOICE_LANGUAGE;
+    return LATIN_SCRIPT_LANGUAGES.includes(selected.split('-')[0]) ? selected : DEFAULT_VOICE_LANGUAGE;
 }
 
 /** Best installed voice for a language: exact locale first, then any voice of the same base language. */

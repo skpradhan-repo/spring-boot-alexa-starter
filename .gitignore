@@ -35,3 +35,8 @@ build/
 ### Local secrets ###
 .env
 !.env.example
+
+### Local speech service ###
+speech-service/.venv/
+__pycache__/
+.pytest_cache/

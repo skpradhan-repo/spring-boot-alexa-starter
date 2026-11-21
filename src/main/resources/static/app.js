@@ -3,11 +3,12 @@ import { askAssistant } from './js/chat.js';
 import { askDocuments, describeDocument, uploadDocument, validateUpload, waitForIndexing } from './js/documents.js';
 import { h } from './js/dom.js';
 import { INTENTS, REQUEST_TYPES, SESSION_END_REASONS, findIntent } from './js/interactionModel.js';
-import { DEFAULT_VOICE_LANGUAGE, VOICE_LANGUAGES } from './js/languages.js';
+import { DEFAULT_VOICE_LANGUAGE, VOICE_LANGUAGES, languageLabel, localLanguageCode } from './js/languages.js';
 import { Simulator, DEFAULT_SKILL_ID } from './js/simulator.js';
 import { SimulatorSession } from './js/session.js';
 import { cancelSpeech, describeSpeakResult, speak } from './js/speech.js';
-import { bindVoice } from './js/voice.js';
+import { createSupportTracker, describeEngine, languageOptionLabel } from './js/support.js';
+import { ENGINES, bindVoice } from './js/voice.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -146,23 +147,67 @@ document.querySelectorAll('.tab').forEach((button) => {
     });
 });
 
-fillSelect($('voiceLang'), VOICE_LANGUAGES.map((language) => language.code),
-    (code) => VOICE_LANGUAGES.find((language) => language.code === code).label);
-try {
-    const saved = localStorage.getItem(LANG_KEY);
-    $('voiceLang').value = VOICE_LANGUAGES.some((language) => language.code === saved) ? saved : DEFAULT_VOICE_LANGUAGE;
-} catch {
-    $('voiceLang').value = DEFAULT_VOICE_LANGUAGE;
-}
-$('voiceLang').addEventListener('change', () => {
+const ENGINE_KEY = 'assistant-voice-engine';
+
+function readStorage(key) {
     try {
-        localStorage.setItem(LANG_KEY, $('voiceLang').value);
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function writeStorage(key, value) {
+    try {
+        localStorage.setItem(key, value);
     } catch {
         // storage can be unavailable; the selection still applies to this page view
     }
-});
+}
+
+let storage = null;
+try {
+    storage = localStorage;
+} catch {
+    // blocked storage: support simply stays "unknown"
+}
+const support = createSupportTracker(storage);
+
+fillSelect($('voiceEngine'), ENGINES.map((engine) => engine.id),
+    (id) => ENGINES.find((engine) => engine.id === id).label);
+const savedEngine = readStorage(ENGINE_KEY);
+$('voiceEngine').value = ENGINES.some((engine) => engine.id === savedEngine) ? savedEngine : 'browser';
+
+fillSelect($('voiceLang'), VOICE_LANGUAGES.map((language) => language.code));
+const savedLang = readStorage(LANG_KEY);
+$('voiceLang').value = VOICE_LANGUAGES.some((language) => language.code === savedLang) ? savedLang : DEFAULT_VOICE_LANGUAGE;
 
 const voiceLang = () => $('voiceLang').value;
+const voiceEngine = () => $('voiceEngine').value;
+
+/** Relabels the language list with what this engine has been seen to do, and explains the engine honestly. */
+function refreshVoiceSettings() {
+    const engine = voiceEngine();
+    const selected = voiceLang();
+    for (const option of $('voiceLang').options) {
+        const language = VOICE_LANGUAGES.find((entry) => entry.code === option.value);
+        option.textContent = languageOptionLabel(language.label, support.status(engine, language.code));
+    }
+    $('engineInfo').textContent = describeEngine(
+        engine, languageLabel(selected), support.status(engine, selected), Boolean(localLanguageCode(selected)));
+}
+
+$('voiceLang').addEventListener('change', () => {
+    writeStorage(LANG_KEY, voiceLang());
+    refreshVoiceSettings();
+});
+$('voiceEngine').addEventListener('change', () => {
+    writeStorage(ENGINE_KEY, voiceEngine());
+    refreshVoiceSettings();
+});
+refreshVoiceSettings();
+
+const sharedVoice = { getLang: voiceLang, getEngine: voiceEngine, support, onSupportChange: refreshVoiceSettings };
 
 /** Reads a reply aloud when enabled, and tells the user when that is not possible instead of staying silent. */
 function speakReply(text, setStatusFn) {
@@ -262,11 +307,12 @@ $('generalClear').addEventListener('click', () => {
 bindVoice({
     micButton: $('generalMic'),
     stopButton: $('generalStop'),
+    clearButton: $('generalClearText'),
     input: $('generalInput'),
     submit: handleGeneral,
     setStatus: setGeneralStatus,
-    getLang: voiceLang,
     indicator: $('generalLog'),
+    ...sharedVoice,
 });
 
 // ---------------------------------------------------------------- tab 1: chat input and voice
@@ -295,11 +341,12 @@ $('messageInput').addEventListener('keydown', (event) => {
 bindVoice({
     micButton: $('micButton'),
     stopButton: $('stopMicButton'),
+    clearButton: $('clearMicText'),
     input: $('messageInput'),
     submit: sendMessage,
     setStatus,
-    getLang: voiceLang,
     indicator: $('history'),
+    ...sharedVoice,
 });
 
 // ---------------------------------------------------------------- tab 3: knowledge documents
@@ -420,11 +467,12 @@ $('askClear').addEventListener('click', () => {
 bindVoice({
     micButton: $('askMic'),
     stopButton: $('askStop'),
+    clearButton: $('askClearText'),
     input: $('askInput'),
     submit: handleAsk,
     setStatus: setAskStatus,
-    getLang: voiceLang,
     indicator: $('askLog'),
+    ...sharedVoice,
 });
 
 // ---------------------------------------------------------------- session controls
