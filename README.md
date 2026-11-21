@@ -7,6 +7,7 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
 * **Browser simulator:**
   * Intent selector, request builder with slot editing, and a raw JSON editor.
   * Conversation history, request/response inspector, session inspector and error panel.
+  * **Knowledge documents panel** (Developer Mode): upload a file, pick an access group, and watch it go `PENDING` -> `INDEXED` (or `FAILED` with the reason).
   * Voice start/stop (Web Speech API, Chrome or Edge) and optional spoken replies.
   * New session / clear conversation.
   * **Simple Mode** vs **Developer Mode** toggle (persisted in `localStorage`).
@@ -30,7 +31,7 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
 4. **Run the tests:**
    ```bash
    ./mvnw test
-   node --test src/test/js/simulator.test.mjs
+   node --test src/test/js/simulator.test.mjs src/test/js/documents.test.mjs
    ```
 
 Use the online `./mvnw`: an offline build (`-o`) fails unless the ASK servlet jar is already in the local Maven cache.
@@ -65,6 +66,8 @@ Accepted: PDF, DOCX, TXT, HTML and Markdown up to 20 MB; the content must match 
 returns `200` with `"duplicate": true`. Changed content under the same name becomes the next version. Documents are only
 visible within their `access_group` (a stand-in for real identity until JWT lands). English, Hindi and Odia are supported.
 Without the `knowledge` profile none of this is active and the simulator and chat need no database.
+
+You can also upload from the browser: open `http://localhost:8080/`, switch to **Developer** mode and use the **Knowledge documents** panel.
 
 Ready-made English, Hindi and Odia test files, with expected results and a checklist, are in [`samples/`](samples/README.md).
 

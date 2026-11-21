@@ -18,6 +18,10 @@ so you can compare how each language is handled.
 
 Start Ollama and PostgreSQL, then the app with the `knowledge` profile (see the main README).
 
+**Easiest: use the browser.** Open `http://localhost:8080/`, switch to **Developer** mode, and in the
+**Knowledge documents** panel choose a file, set the access group and press **Upload and index**. The panel
+shows the status and language as it changes. The curl commands below do the same thing.
+
 Run curl **from the project folder**: `@samples/...` is relative to the folder you are in, and curl reports
 `(26) Failed to open/read local data` when the file is not there. Any other file works with a full path,
 for example `-F "file=@C:/Users/me/Downloads/notes.txt"`.

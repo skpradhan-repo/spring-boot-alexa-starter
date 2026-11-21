@@ -123,6 +123,29 @@
                 <pre id="rawResponse" class="code" tabindex="0">No response yet.</pre>
             </section>
 
+            <section class="panel" aria-labelledby="documentsTitle">
+                <div class="panel-header">
+                    <h2 id="documentsTitle">Knowledge documents</h2>
+                </div>
+
+                <div class="field-grid">
+                    <label for="docFile">File</label>
+                    <input type="file" id="docFile" accept=".pdf,.docx,.txt,.html,.md">
+
+                    <label for="docGroup">Access group</label>
+                    <input type="text" id="docGroup" value="public" autocomplete="off" spellcheck="false">
+                </div>
+                <p class="hint">PDF, DOCX, TXT, HTML or Markdown, up to 20 MB. English, Hindi and Odia are supported.
+                    Needs the app to run with the <code>knowledge</code> profile.</p>
+
+                <div class="button-row">
+                    <button type="button" id="docUpload" class="primary">Upload and index</button>
+                </div>
+
+                <p id="docStatus" class="status" role="status" aria-live="polite"></p>
+                <ul id="docList" class="doc-list"></ul>
+            </section>
+
             <section class="panel" aria-labelledby="sessionTitle">
                 <div class="panel-header">
                     <h2 id="sessionTitle">Session inspector</h2>

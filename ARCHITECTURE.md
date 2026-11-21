@@ -28,6 +28,7 @@ flowchart LR
 | Chat | `chat` | Browser chat API, system prompt, input limits |
 | Model Gateway | `gateway` | `ChatGateway` port, Spring AI adapter, resilience decorator, health |
 | Knowledge | `knowledge`, `db/migration` | Upload API, validation, Tika extraction, chunking, embeddings, documents and chunks in PostgreSQL |
+| Developer portal | `static/` | Simulator UI; its Knowledge documents panel (`js/documents.js`) calls `/api/documents` and polls status |
 
 ## Knowledge ingestion
 

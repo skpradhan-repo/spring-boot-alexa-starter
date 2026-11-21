@@ -1,4 +1,5 @@
 import { postAlexaRequest } from './js/api.js';
+import { describeDocument, uploadDocument, validateUpload, waitForIndexing } from './js/documents.js';
 import { h } from './js/dom.js';
 import { INTENTS, REQUEST_TYPES, SESSION_END_REASONS, findIntent } from './js/interactionModel.js';
 import { Simulator, DEFAULT_SKILL_ID } from './js/simulator.js';
@@ -168,6 +169,63 @@ if (recognizer.supported) {
     $('micButton').disabled = true;
     setStatus('Voice input is not supported in this browser - type your message instead.');
 }
+
+// ---------------------------------------------------------------- knowledge documents
+
+const documentRows = new Map();
+
+function renderDocumentRow(id, name, state, detail) {
+    const row = documentRows.get(id) ?? h('li');
+    documentRows.set(id, row);
+    row.replaceChildren(
+        h('span', { class: 'doc-name', text: name }),
+        h('span', { class: `badge ${state.toLowerCase()}`, text: state }),
+        h('div', { class: 'doc-detail', text: detail }),
+        h('div', { class: 'doc-detail' }, h('code', { text: id })),
+    );
+    $('docList').prepend(row);
+}
+
+async function handleUpload() {
+    const file = $('docFile').files[0];
+    const group = $('docGroup').value.trim();
+    const problem = validateUpload(file, group);
+    if (problem) {
+        $('docStatus').textContent = problem;
+        return;
+    }
+
+    $('docUpload').disabled = true;
+    $('docStatus').textContent = `Uploading ${file.name}...`;
+    try {
+        const uploaded = await uploadDocument(file, group);
+        if (!uploaded.ok) {
+            $('docStatus').textContent = uploaded.error;
+            return;
+        }
+        const { id, name } = uploaded.document;
+        renderDocumentRow(id, name, uploaded.document.status, describeDocument(uploaded.document));
+        $('docStatus').textContent = uploaded.document.duplicate
+            ? 'Identical content was already uploaded to this group.'
+            : 'Accepted. Indexing in the background...';
+
+        const finished = await waitForIndexing(id, group, {
+            onUpdate: (result) => result.ok && renderDocumentRow(id, name, result.document.status, describeDocument(result.document)),
+        });
+        if (!finished.ok) {
+            $('docStatus').textContent = finished.error;
+        } else if (finished.document.status === 'PENDING') {
+            $('docStatus').textContent = 'Still indexing. The first embedding call can be slow; check again shortly.';
+        } else {
+            $('docStatus').textContent = describeDocument({ ...finished.document, duplicate: uploaded.document.duplicate });
+            $('docFile').value = '';
+        }
+    } finally {
+        $('docUpload').disabled = false;
+    }
+}
+
+$('docUpload').addEventListener('click', handleUpload);
 
 // ---------------------------------------------------------------- session controls
 
