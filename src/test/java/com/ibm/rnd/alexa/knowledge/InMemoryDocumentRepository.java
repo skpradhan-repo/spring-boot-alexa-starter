@@ -56,6 +56,36 @@ class InMemoryDocumentRepository implements DocumentRepository {
     }
 
     @Override
+    public List<RetrievedChunk> searchSimilar(String accessGroup, float[] queryVector, int limit) {
+        List<RetrievedChunk> hits = new ArrayList<>();
+        for (StoredDocument d : documents.values()) {
+            boolean latest = documents.values().stream().noneMatch(o -> o.accessGroup().equals(d.accessGroup())
+                    && o.name().equals(d.name()) && o.status() == DocumentStatus.INDEXED && o.version() > d.version());
+            if (!d.accessGroup().equals(accessGroup) || d.status() != DocumentStatus.INDEXED || !latest) {
+                continue;
+            }
+            for (EmbeddedChunk c : chunks.getOrDefault(d.id(), List.of())) {
+                hits.add(new RetrievedChunk(d.name(), d.version(), c.chunk().index(), c.chunk().text(),
+                        cosine(queryVector, c.vector())));
+            }
+        }
+        hits.sort((a, b) -> Double.compare(b.score(), a.score()));
+        return hits.stream().limit(limit).toList();
+    }
+
+    private static double cosine(float[] a, float[] b) {
+        double dot = 0;
+        double na = 0;
+        double nb = 0;
+        for (int i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            na += a[i] * a[i];
+            nb += b[i] * b[i];
+        }
+        return na == 0 || nb == 0 ? 0 : dot / Math.sqrt(na * nb);
+    }
+
+    @Override
     public void delete(UUID id) {
         documents.remove(id);
         checksums.remove(id);

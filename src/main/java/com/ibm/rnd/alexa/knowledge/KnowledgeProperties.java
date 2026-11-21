@@ -5,6 +5,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -21,6 +23,9 @@ import jakarta.validation.constraints.NotNull;
  * @param maxExtractedChars   upper bound on text extracted from one file (guards against decompression bombs)
  * @param ingestionThreads    parallel indexing jobs (kept low: embedding competes with chat for the CPU)
  * @param ingestionQueueSize  uploads waiting for a worker; further uploads are rejected with 429
+ * @param retrievalTopK       most similar chunks handed to the model when answering a question
+ * @param retrievalMinScore   cosine similarity below which a chunk is treated as unrelated (no model call if none pass)
+ * @param retrievalContextChars upper bound on source text sent to the model; small on purpose, a CPU model has a short context
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.knowledge")
@@ -33,7 +38,10 @@ public record KnowledgeProperties(
         @Min(1) @DefaultValue("1024") int embeddingDimensions,
         @Min(1000) @DefaultValue("2000000") int maxExtractedChars,
         @Min(1) @Max(4) @DefaultValue("1") int ingestionThreads,
-        @Min(1) @Max(100) @DefaultValue("10") int ingestionQueueSize) {
+        @Min(1) @Max(100) @DefaultValue("10") int ingestionQueueSize,
+        @Min(1) @Max(10) @DefaultValue("3") int retrievalTopK,
+        @DecimalMin("0.0") @DecimalMax("1.0") @DefaultValue("0.4") double retrievalMinScore,
+        @Min(500) @DefaultValue("3000") int retrievalContextChars) {
 
     public KnowledgeProperties {
         if (chunkOverlapTokens >= chunkTokens) {

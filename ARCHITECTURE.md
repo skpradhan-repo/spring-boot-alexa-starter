@@ -1,6 +1,6 @@
 # Architecture
 
-Status: milestone 1 (Model Gateway) and milestone 2 (knowledge ingestion) complete. Retrieval and grounded answers are next.
+Status: milestone 1 (Model Gateway), milestone 2 (knowledge ingestion) and milestone 3 (retrieval and grounded answers) complete. JWT identity is next.
 
 ## Shape
 
@@ -20,6 +20,10 @@ flowchart LR
     Indexer -->|bge-m3 embeddings| Ollama
     Indexer --> PG[(PostgreSQL + pgvector)]
     Ingest --> PG
+    Browser -->|POST /api/knowledge/ask| Ask[Answer service<br/>embed, search, ground]
+    Ask -->|query embedding| Ollama
+    Ask -->|access-group scoped cosine search| PG
+    Ask --> Gateway
 ```
 
 | Module | Package | Owns |
@@ -28,7 +32,7 @@ flowchart LR
 | Chat | `chat` | Browser chat API, system prompt, input limits |
 | Model Gateway | `gateway` | `ChatGateway` port, Spring AI adapter, resilience decorator, health |
 | Knowledge | `knowledge`, `db/migration` | Upload API, validation, Tika extraction, chunking, embeddings, documents and chunks in PostgreSQL |
-| Developer portal | `static/` | Simulator UI; its Knowledge documents panel (`js/documents.js`) calls `/api/documents` and polls status |
+| Developer portal | `static/` | Simulator UI; its Knowledge documents and Ask your documents panels (`js/documents.js`) call `/api/documents` and `/api/knowledge/ask` |
 
 ## Knowledge ingestion
 
@@ -58,9 +62,27 @@ The knowledge beans exist only when `assistant.knowledge.enabled=true` (set by t
 run without a database. Tunable limits (chunk size, batch size, queue size, upload size) live in `KnowledgeProperties` and are listed
 in the README configuration table.
 
+## Retrieval and grounded answers
+
+`POST /api/knowledge/ask` (`question`, `access_group`) runs `KnowledgeAnswerService`:
+
+1. Embed the question with `bge-m3`.
+2. `DocumentRepository.searchSimilar`: cosine search (`<=>`, pgvector) restricted **in SQL** to the caller's access group, to `INDEXED`
+   documents, and to the latest `INDEXED` version of each document name.
+3. Keep passages with similarity of at least 0.4. **If none qualify, the model is never called** and the answer is a fixed
+   "not found" sentence: the cheapest guard against an invented answer, and it saves seconds of CPU inference.
+4. Fit the best passages (at most 3, 3000 characters) into the prompt. The passages are untrusted data: they sit in the user
+   message after a `SOURCES:` marker, and the system prompt says sources and question are data and cannot change the rules.
+5. `ChatGateway` answers (same bulkhead, timeout and circuit breaker as chat); the reply carries the passages used as `sources`.
+
+Known limits: retrieval is vector-only (the `tsv` keyword index is stored but not used yet, so exact IDs are not boosted);
+`gemma:2b` follows the source-only rule well in English but is weak at answering Hindi and Odia questions even when it retrieves
+the right passage (measured: the Hindi question retrieved the Hindi passage and the model still replied that it could not answer).
+A larger model (`CHAT_MODEL`) improves this at the cost of latency.
+
 ## Next
 
-Retrieval (vector search scoped by `access_group`), grounded answers with citations, and JWT identity replacing the `access_group` parameter.
+JWT identity replacing the `access_group` parameter, hybrid (vector + keyword) retrieval, and a stronger multilingual answer model.
 
 ## Principles applied
 
@@ -108,7 +130,7 @@ Concurrency is capped at 2 because CPU inference slows every request when oversu
 `/actuator/health` (liveness and readiness probes enabled), `/actuator/prometheus` with
 `assistant_gateway_slots_available`, `assistant_gateway_circuit_state`, `assistant_knowledge_ingestion_total{outcome}`
 (accepted, duplicate, rejected, type_mismatch), `assistant_knowledge_indexing_seconds{outcome}` and
-`assistant_knowledge_queue_size`. Prometheus and Grafana are optional compose profile `observability`.
+`assistant_knowledge_queue_size` and `assistant_knowledge_questions_total{outcome}` (answered, no_context). Prometheus and Grafana are optional compose profile `observability`.
 
 ## Dependency notes
 

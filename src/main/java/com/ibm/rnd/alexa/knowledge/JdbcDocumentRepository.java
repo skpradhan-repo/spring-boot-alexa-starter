@@ -88,6 +88,27 @@ class JdbcDocumentRepository implements DocumentRepository {
     }
 
     @Override
+    public List<RetrievedChunk> searchSimilar(String accessGroup, float[] queryVector, int limit) {
+        return jdbc.sql("""
+                        SELECT d.name, d.version, c.chunk_index, c.content,
+                               1 - (c.embedding <=> CAST(:query AS vector)) AS score
+                        FROM document_chunks c
+                        JOIN documents d ON d.id = c.document_id
+                        WHERE d.access_group = :group
+                          AND d.status = 'INDEXED'
+                          AND d.version = (SELECT max(v.version) FROM documents v
+                                           WHERE v.access_group = d.access_group AND v.name = d.name
+                                             AND v.status = 'INDEXED')
+                        ORDER BY c.embedding <=> CAST(:query AS vector)
+                        LIMIT :limit
+                        """)
+                .param("query", toVectorLiteral(queryVector)).param("group", accessGroup).param("limit", limit)
+                .query((rs, row) -> new RetrievedChunk(rs.getString("name"), rs.getInt("version"),
+                        rs.getInt("chunk_index"), rs.getString("content"), rs.getDouble("score")))
+                .list();
+    }
+
+    @Override
     public void delete(UUID id) {
         jdbc.sql("DELETE FROM documents WHERE id = :id").param("id", id).update();
     }

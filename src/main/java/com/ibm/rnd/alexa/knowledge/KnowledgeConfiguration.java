@@ -15,6 +15,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.ibm.rnd.alexa.gateway.ChatGateway;
+
 import io.micrometer.core.instrument.MeterRegistry;
 
 /**
@@ -61,6 +63,12 @@ public class KnowledgeConfiguration {
         return new DocumentIndexer(extractor, new TextNormalizer(), new LanguageDetector(),
                 new TextChunker(properties.chunkTokens(), properties.chunkOverlapTokens()),
                 embeddingModel, repository, properties, registry);
+    }
+
+    @Bean
+    KnowledgeAnswerService knowledgeAnswerService(DocumentRepository repository, EmbeddingModel embeddingModel,
+            ChatGateway chatGateway, KnowledgeProperties properties, MeterRegistry registry) {
+        return new KnowledgeAnswerService(repository, embeddingModel, chatGateway, properties, registry);
     }
 
     @Bean

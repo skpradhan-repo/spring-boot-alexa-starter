@@ -64,6 +64,9 @@ class DocumentIngestionIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private DocumentRepository repository;
+
     private StoredDocument await(UUID id, String group) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
         while (System.nanoTime() < deadline) {
@@ -170,6 +173,44 @@ class DocumentIngestionIntegrationTest {
                 .toList();
 
         assertThat(versions).doesNotHaveDuplicates().containsExactlyInAnyOrder(1, 2, 3, 4, 5, 6);
+    }
+
+    @Test
+    void similaritySearchRanksByCosineAndRespectsGroupStatusAndLatestVersion() throws Exception {
+        // FakeEmbeddingModel puts the text length on axis 0, so use chunk vectors directly for a clear geometry.
+        String group = "search-" + UUID.randomUUID().toString().substring(0, 8);
+        UUID leave = ingestion.submit("leave.txt", utf8("leave"), group).document().id();
+        await(leave, group);
+        UUID other = ingestion.submit("other.txt", utf8("other"), group).document().id();
+        await(other, group);
+        UUID foreign = ingestion.submit("leave.txt", utf8("leave"), group + "-x").document().id();
+        await(foreign, group + "-x");
+
+        float[] towardsAxis0 = new float[1024];
+        towardsAxis0[0] = 1;
+        float[] towardsAxis1 = new float[1024];
+        towardsAxis1[1] = 1;
+        jdbc.sql("UPDATE document_chunks SET embedding = CAST(:v AS vector) WHERE document_id = :id")
+                .param("v", JdbcDocumentRepository.toVectorLiteral(towardsAxis0)).param("id", leave).update();
+        jdbc.sql("UPDATE document_chunks SET embedding = CAST(:v AS vector) WHERE document_id = :id")
+                .param("v", JdbcDocumentRepository.toVectorLiteral(towardsAxis1)).param("id", other).update();
+
+        List<RetrievedChunk> hits = repository.searchSimilar(group, towardsAxis0, 5);
+
+        assertThat(hits).extracting(RetrievedChunk::documentName).containsExactly("leave.txt", "other.txt");
+        assertThat(hits.get(0).score()).isCloseTo(1.0, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(hits.get(1).score()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(1e-6));
+
+        // A newer version replaces the older one in search results.
+        UUID v2 = ingestion.submit("leave.txt", utf8("leave, revised"), group).document().id();
+        await(v2, group);
+        jdbc.sql("UPDATE document_chunks SET embedding = CAST(:v AS vector) WHERE document_id = :id")
+                .param("v", JdbcDocumentRepository.toVectorLiteral(towardsAxis0)).param("id", v2).update();
+        List<RetrievedChunk> afterRevision = repository.searchSimilar(group, towardsAxis0, 5);
+        assertThat(afterRevision).filteredOn(c -> c.documentName().equals("leave.txt"))
+                .extracting(RetrievedChunk::version).containsExactly(2);
+
+        assertThat(repository.searchSimilar("no-such-group", towardsAxis0, 5)).isEmpty();
     }
 
     @Test

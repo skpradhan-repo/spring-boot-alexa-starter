@@ -24,6 +24,12 @@ interface DocumentRepository {
 
     void markFailed(UUID id, String failureReason);
 
+    /**
+     * Nearest chunks to {@code queryVector} by cosine similarity. Only INDEXED documents of {@code accessGroup}
+     * are searched, and only the latest INDEXED version of each document name, so superseded text is never quoted.
+     */
+    List<RetrievedChunk> searchSimilar(String accessGroup, float[] queryVector, int limit);
+
     /** Removes a document that never started processing (for example the queue rejected it). */
     void delete(UUID id);
 }

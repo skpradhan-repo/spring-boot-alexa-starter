@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-    describeDocument, getDocument, uploadDocument, validateUpload, waitForIndexing,
+    askDocuments, describeDocument, getDocument, uploadDocument, validateUpload, waitForIndexing,
 } from '../../main/resources/static/js/documents.js';
 
 const reply = (status, body) => async () => ({ ok: status < 400, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
@@ -54,7 +54,7 @@ describe('uploadDocument', () => {
     });
 
     it('maps 429, server detail and network failures to readable errors', async () => {
-        assert.match((await uploadDocument(new Blob(['x']), 'hr', { fetchImpl: reply(429, {}) })).error, /queue is full/);
+        assert.match((await uploadDocument(new Blob(['x']), 'hr', { fetchImpl: reply(429, {}) })).error, /queue is full|is busy/);
         assert.match((await uploadDocument(new Blob(['x']), 'hr', { fetchImpl: reply(415, { detail: 'Unsupported document type' }) })).error, /Unsupported document type/);
         const offline = await uploadDocument(new Blob(['x']), 'hr', { fetchImpl: async () => { throw new TypeError('offline'); } });
         assert.equal(offline.status, 0);
@@ -136,5 +136,40 @@ describe('describeDocument', () => {
         assert.match(describeDocument(doc({ status: 'FAILED', failureReason: 'EMBEDDING_UNAVAILABLE' })), /Ollama/);
         assert.match(describeDocument(doc({ status: 'FAILED', failureReason: 'SOMETHING_NEW' })), /did not complete/);
         assert.match(describeDocument(doc({ status: 'PENDING' })), /in progress/);
+    });
+});
+
+describe('askDocuments', () => {
+    const answer = { answer: '24 days.', grounded: true, sources: [{ document: 'leave.txt', excerpt: 'Annual leave is 24 days' }] };
+
+    it('posts the question and access group as JSON and returns the answer', async () => {
+        let seen;
+        const result = await askDocuments('How many days?', 'hr', {
+            fetchImpl: async (url, init) => { seen = { url, init }; return reply(200, answer)(); },
+        });
+
+        assert.equal(result.ok, true);
+        assert.deepEqual(result.answer, answer);
+        assert.equal(seen.url, '/api/knowledge/ask');
+        assert.equal(seen.init.method, 'POST');
+        assert.equal(seen.init.headers['Content-Type'], 'application/json');
+        assert.deepEqual(JSON.parse(seen.init.body), { question: 'How many days?', access_group: 'hr' });
+    });
+
+    it('explains a missing knowledge profile, a down model and a busy server', async () => {
+        const missing = await askDocuments('q', 'hr', { fetchImpl: reply(404, { detail: 'No static resource api/knowledge/ask.' }) });
+        assert.match(missing.error, /not enabled/);
+        assert.match((await askDocuments('q', 'hr', { fetchImpl: reply(503, {}) })).error, /Ollama/);
+        assert.match((await askDocuments('q', 'hr', { fetchImpl: reply(429, {}) })).error, /busy/);
+    });
+
+    it('shows the server message for a rejected question and reports network failures', async () => {
+        const rejected = await askDocuments('q', 'BAD', { fetchImpl: reply(400, { detail: 'The access group is invalid' }) });
+        assert.equal(rejected.ok, false);
+        assert.equal(rejected.answer, null);
+        assert.match(rejected.error, /access group is invalid/);
+
+        const offline = await askDocuments('q', 'hr', { fetchImpl: async () => { throw new TypeError('offline'); } });
+        assert.match(offline.error, /Network error: offline/);
     });
 });

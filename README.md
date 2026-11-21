@@ -8,6 +8,7 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
   * Intent selector, request builder with slot editing, and a raw JSON editor.
   * Conversation history, request/response inspector, session inspector and error panel.
   * **Knowledge documents panel** (Developer Mode): upload a file, pick an access group, and watch it go `PENDING` -> `INDEXED` (or `FAILED` with the reason).
+  * **Ask your documents panel** (both modes): ask a question and get an answer grounded in the uploaded documents, with the source passages shown.
   * Voice start/stop (Web Speech API, Chrome or Edge) and optional spoken replies.
   * New session / clear conversation.
   * **Simple Mode** vs **Developer Mode** toggle (persisted in `localStorage`).
@@ -93,6 +94,21 @@ visible within their `access_group` (a stand-in for real identity until JWT land
 Without the `knowledge` profile none of this is active and the simulator and chat need no database.
 
 You can also upload from the browser: open `http://localhost:8080/`, switch to **Developer** mode and use the **Knowledge documents** panel.
+
+### Asking questions about your documents
+
+In the browser, use the **Ask your documents** panel (visible in both modes): enter the access group the files were uploaded to,
+type a question and press **Ask**. Answers take about 2-8 seconds on a CPU-only machine. Or call the API:
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/knowledge/ask -H "Content-Type: application/json" \
+  -d '{"question":"How many days of annual leave do employees get?","access_group":"hr"}'
+```
+
+The reply has `answer`, `grounded` and `sources` (document, version, match score, excerpt). Only the caller's access group is searched,
+and only the latest version of each document. If nothing is similar enough, the model is not called and the answer is
+"I could not find this in the uploaded documents." (`grounded: false`). On Windows PowerShell write the JSON to a file and use
+`--data-binary "@file.json"`, because PowerShell mangles quotes and non-English text passed inline.
 
 Ready-made English, Hindi and Odia test files, with expected results and a checklist, are in [`samples/`](samples/README.md).
 
@@ -181,5 +197,8 @@ The UI lives in `src/main/resources/static/` (`app.js` is the shell; logic is in
 | `assistant.knowledge.embedding-dimensions` | `1024` | Vector size the schema stores (`bge-m3`); a mismatch fails indexing. |
 | `assistant.knowledge.max-extracted-chars` | `2000000` | Cap on text extracted from one file. |
 | `assistant.knowledge.ingestion-threads` / `ingestion-queue-size` | `1` / `10` | Indexing workers and waiting uploads; a full queue answers `429`. |
+| `assistant.knowledge.retrieval-top-k` | `3` | Passages given to the model per question. |
+| `assistant.knowledge.retrieval-min-score` | `0.4` | Cosine similarity below which a passage counts as unrelated; if none pass, the model is not called. |
+| `assistant.knowledge.retrieval-context-chars` | `3000` | Upper bound on source text sent to the model. |
 
 For real Alexa traffic run with `SPRING_PROFILES_ACTIVE=prod` behind a TLS-terminating proxy, and set `ALEXA_SKILL_ID`.

@@ -104,7 +104,7 @@ body[data-mode="simple"] .dev-only { display: none; }
     body[data-mode="developer"] .layout { grid-template-columns: minmax(0, 1fr); }
 }
 
-.dev-column { display: flex; flex-direction: column; gap: 16px; }
+.dev-column, .main-column { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .panel {
     background: var(--surface);
@@ -291,6 +291,11 @@ input[type="file"] { width: 100%; color: var(--text); font: inherit; font-size: 
 .doc-list .doc-name { font-weight: 600; margin-right: 8px; }
 .doc-list .doc-detail { color: var(--muted); margin-top: 4px; }
 .doc-list code { font-size: 11px; }
+
+.ask-result { margin-top: 8px; }
+.ask-answer { background: #1d3a5f; border-radius: 12px; padding: 12px; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.ask-result h3 { margin: 12px 0 6px; font-size: 13px; color: var(--muted); }
+.ask-result[hidden] { display: none; }
 
 /* ---------- errors ---------- */
 

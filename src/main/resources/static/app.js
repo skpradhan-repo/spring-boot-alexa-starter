@@ -1,5 +1,5 @@
 import { postAlexaRequest } from './js/api.js';
-import { describeDocument, uploadDocument, validateUpload, waitForIndexing } from './js/documents.js';
+import { askDocuments, describeDocument, uploadDocument, validateUpload, waitForIndexing } from './js/documents.js';
 import { h } from './js/dom.js';
 import { INTENTS, REQUEST_TYPES, SESSION_END_REASONS, findIntent } from './js/interactionModel.js';
 import { Simulator, DEFAULT_SKILL_ID } from './js/simulator.js';
@@ -226,6 +226,52 @@ async function handleUpload() {
 }
 
 $('docUpload').addEventListener('click', handleUpload);
+
+// ---------------------------------------------------------------- ask your documents
+
+async function handleAsk() {
+    const question = $('askInput').value.trim();
+    const group = $('askGroup').value.trim();
+    if (!question) {
+        $('askStatus').textContent = 'Type a question first.';
+        return;
+    }
+    if (!group) {
+        $('askStatus').textContent = 'Enter the access group the documents were uploaded to.';
+        return;
+    }
+
+    $('askButton').disabled = true;
+    $('askResult').hidden = true;
+    $('askStatus').textContent = 'Searching your documents and asking the model... this can take several seconds.';
+    try {
+        const result = await askDocuments(question, group);
+        if (!result.ok) {
+            $('askStatus').textContent = result.error;
+            return;
+        }
+        const { answer, grounded, sources } = result.answer;
+        $('askAnswer').textContent = answer;
+        $('askSources').replaceChildren(...sources.map((source) => h('li', {},
+            h('span', { class: 'doc-name', text: source.document }),
+            h('span', { class: 'badge none', text: `v${source.version} - match ${Math.round(source.score * 100)}%` }),
+            h('div', { class: 'doc-detail', text: source.excerpt }),
+        )));
+        $('askResult').hidden = false;
+        $('askStatus').textContent = grounded
+            ? `Answered from ${sources.length} passage(s).`
+            : 'Nothing in this access group matched. Check the group name and that the document shows INDEXED.';
+    } finally {
+        $('askButton').disabled = false;
+    }
+}
+
+$('askButton').addEventListener('click', handleAsk);
+$('askInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        handleAsk();
+    }
+});
 
 // ---------------------------------------------------------------- session controls
 

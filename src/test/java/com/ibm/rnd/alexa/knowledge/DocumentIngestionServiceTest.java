@@ -36,7 +36,7 @@ class DocumentIngestionServiceTest {
     private DocumentIngestionService service;
 
     private static KnowledgeProperties properties(DataSize max) {
-        return new KnowledgeProperties(true, max, 500, 60, 16, DIMENSIONS, 1_000_000, 1, 10);
+        return new KnowledgeProperties(true, max, 500, 60, 16, DIMENSIONS, 1_000_000, 1, 10, 3, 0.4, 3000);
     }
 
     private static EmbeddingModel fakeEmbeddings() {

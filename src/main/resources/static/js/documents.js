@@ -80,6 +80,20 @@ export function describeDocument(document) {
     return 'Indexing in progress...';
 }
 
+/**
+ * Asks a question about the uploaded documents of an access group.
+ *
+ * @returns {Promise<{ok:boolean,status:number,answer:{answer:string,grounded:boolean,sources:object[]}|null,error:string|null}>}
+ */
+export async function askDocuments(question, accessGroup, { url = '/api/knowledge/ask', fetchImpl = globalThis.fetch.bind(globalThis) } = {}) {
+    const result = await call(() => fetchImpl(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, access_group: accessGroup }),
+    }));
+    return { ok: result.ok, status: result.status, answer: result.document, error: result.error };
+}
+
 async function call(request) {
     let response;
     try {
@@ -113,7 +127,10 @@ function errorText(status, body) {
         return 'Document not found in this access group.';
     }
     if (status === 429) {
-        return 'The indexing queue is full. Try again in a moment.';
+        return 'The server is busy (indexing queue or model is full). Try again in a moment.';
+    }
+    if (status === 503) {
+        return 'The model is not reachable. Check that Ollama is running, then try again.';
     }
     return body?.detail ?? `HTTP ${status}`;
 }
