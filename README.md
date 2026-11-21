@@ -66,6 +66,8 @@ returns `200` with `"duplicate": true`. Changed content under the same name beco
 visible within their `access_group` (a stand-in for real identity until JWT lands). English, Hindi and Odia are supported.
 Without the `knowledge` profile none of this is active and the simulator and chat need no database.
 
+Ready-made English, Hindi and Odia test files, with expected results and a checklist, are in [`samples/`](samples/README.md).
+
 Switch the chat model without code changes: `CHAT_MODEL=qwen3.5:9b`. On this CPU-only machine `gemma:2b` answers in about 1 s to first token, while a 9B model is far too slow for voice (measurements in [ARCHITECTURE.md](ARCHITECTURE.md)).
 
 ```bash
