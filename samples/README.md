@@ -16,11 +16,22 @@ so you can compare how each language is handled.
 
 ## Try them
 
-Start Ollama and PostgreSQL, then the app with the `knowledge` profile (see the main README). Then, from the project root:
+Start Ollama and PostgreSQL, then the app with the `knowledge` profile (see the main README).
+
+Run curl **from the project folder**: `@samples/...` is relative to the folder you are in, and curl reports
+`(26) Failed to open/read local data` when the file is not there. Any other file works with a full path,
+for example `-F "file=@C:/Users/me/Downloads/notes.txt"`.
 
 ```bash
+cd spring-boot-alexa-starter
 curl -F "file=@samples/documents/leave-policy-hi.txt" -F "access_group=hr" http://127.0.0.1:8080/api/documents
-curl "http://127.0.0.1:8080/api/documents/<id-from-the-first-response>?access_group=hr"
+```
+
+The reply contains an `"id"`. Paste that value into the second command in place of `PASTE-ID-HERE`
+(the literal text `<id>` is rejected by the server with a 400):
+
+```bash
+curl "http://127.0.0.1:8080/api/documents/PASTE-ID-HERE?access_group=hr"
 ```
 
 Expected: the first call returns `202` with `"status":"PENDING"`; the second shows `"status":"INDEXED"`, `"language":"hi"`
