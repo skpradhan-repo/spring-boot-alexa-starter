@@ -50,8 +50,16 @@ Language (`en`, `hi`, `or`) is detected from the dominant Unicode script.
 A failure leaves the document `FAILED` with a coarse code (`EXTRACTION_FAILED`, `EMPTY_DOCUMENT`, `EMBEDDING_UNAVAILABLE`,
 `EMBEDDING_MISMATCH`, `STORAGE_FAILED`). Details go to the server log; **document text is never logged**.
 
-`access_group` is a request parameter for now, a stand-in for the caller identity that JWT will supply. The service already applies
-it in SQL on every lookup, and a document in another group answers `404`, not `403`, so existence is not revealed.
+`access_group` is a request parameter (default `public`) for now, a stand-in for the caller identity that JWT will supply. The service
+already applies it in SQL on every lookup, and a document in another group answers `404`, not `403`, so existence is not revealed.
+
+The knowledge beans exist only when `assistant.knowledge.enabled=true` (set by the `knowledge` profile), so the Alexa webhook and chat
+run without a database. Tunable limits (chunk size, batch size, queue size, upload size) live in `KnowledgeProperties` and are listed
+in the README configuration table.
+
+## Next
+
+Retrieval (vector search scoped by `access_group`), grounded answers with citations, and JWT identity replacing the `access_group` parameter.
 
 ## Principles applied
 

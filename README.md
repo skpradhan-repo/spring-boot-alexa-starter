@@ -60,7 +60,8 @@ curl -F "file=@leave-policy.pdf" -F "access_group=hr" http://127.0.0.1:8080/api/
 curl "http://127.0.0.1:8080/api/documents/<id>?access_group=hr"                                # PENDING -> INDEXED (or FAILED + reason)
 ```
 
-Accepted: PDF, DOCX, TXT, HTML and Markdown up to 20 MB; the content must match the extension. Re-uploading identical bytes
+Accepted: PDF, DOCX, TXT, HTML and Markdown up to 20 MB; the content must match the extension. `access_group` defaults to
+`public` when omitted. Re-uploading identical bytes
 returns `200` with `"duplicate": true`. Changed content under the same name becomes the next version. Documents are only
 visible within their `access_group` (a stand-in for real identity until JWT lands). English, Hindi and Odia are supported.
 Without the `knowledge` profile none of this is active and the simulator and chat need no database.
@@ -118,8 +119,11 @@ config/       AlexaProperties (typed config), AlexaSkillConfiguration (Skill bea
 controller/   AlexaController - thin POST /alexa HTTP adapter
 service/      AlexaRequestService - parse -> validate -> verify -> dispatch -> serialize
 validation/   AlexaRequestValidator, SkillIdVerifier, SimpleAlexaHttpRequest
-exception/    GlobalExceptionHandler (errors -> ProblemDetail), InvalidAlexaRequestException
+exception/    GlobalExceptionHandler (errors -> ProblemDetail), Alexa and document exceptions
 handler/      RequestHandler beans, SkillReply/ReplyRenderer, shared helpers (Ssml, Slots, Sessions)
+chat/         Browser chat API (/api/chat, /api/chat/stream)
+gateway/      ChatGateway port, Spring AI adapter, resilience decorator, health
+knowledge/    Document upload API, extraction, chunking, embeddings, JDBC repository (knowledge profile)
 ```
 
 * **Add a capability:** create a `@Component` extending `ReplyingRequestHandler` (or implementing `RequestHandler`). It is picked up automatically; no other class changes.
@@ -141,5 +145,11 @@ The UI lives in `src/main/resources/static/` (`app.js` is the shell; logic is in
 | `assistant.gateway.queue-timeout` | `2s` | Wait for a free slot before answering `429`. |
 | `assistant.gateway.request-timeout` | `45s` | Hard limit per model call. |
 | `POSTGRES_PASSWORD` | none | Required by the `knowledge` profile and `compose.yaml`; keep it in `.env`. |
+| `assistant.knowledge.max-upload-size` | `20MB` | Largest accepted upload; keep `spring.servlet.multipart.max-file-size` in step. |
+| `assistant.knowledge.chunk-tokens` / `chunk-overlap-tokens` | `500` / `60` | Target chunk size and overlap, in estimated tokens. |
+| `assistant.knowledge.embedding-batch-size` | `16` | Chunks per embedding call. |
+| `assistant.knowledge.embedding-dimensions` | `1024` | Vector size the schema stores (`bge-m3`); a mismatch fails indexing. |
+| `assistant.knowledge.max-extracted-chars` | `2000000` | Cap on text extracted from one file. |
+| `assistant.knowledge.ingestion-threads` / `ingestion-queue-size` | `1` / `10` | Indexing workers and waiting uploads; a full queue answers `429`. |
 
 For real Alexa traffic run with `SPRING_PROFILES_ACTIVE=prod` behind a TLS-terminating proxy, and set `ALEXA_SKILL_ID`.
