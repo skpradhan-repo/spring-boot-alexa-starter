@@ -2,6 +2,7 @@ package com.ibm.rnd.alexa.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -27,10 +28,29 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "Invalid Alexa request");
     }
 
+    /** Failed signature or timestamp: the caller could not be authenticated as Alexa. */
     @ExceptionHandler(SecurityException.class)
     ResponseEntity<ProblemDetail> handleVerificationFailure(SecurityException e) {
         log.warn("Alexa request verification failed: {}", e.getMessage());
-        return problem(HttpStatus.BAD_REQUEST, "Invalid Alexa request");
+        return problem(HttpStatus.UNAUTHORIZED, "Request could not be authenticated");
+    }
+
+    /** Authentic request, but for a different skill. */
+    @ExceptionHandler(SkillNotAuthorizedException.class)
+    ResponseEntity<ProblemDetail> handleWrongSkill(SkillNotAuthorizedException e) {
+        log.warn("Alexa request rejected: {}", e.getMessage());
+        return problem(HttpStatus.FORBIDDEN, "Request is not permitted for this skill");
+    }
+
+    /** The language model cannot take the request right now; clients may retry. */
+    @ExceptionHandler(ModelUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleModelUnavailable(ModelUnavailableException e) {
+        log.warn("Language model unavailable: reason={}", e.reason());
+        HttpStatus status = e.reason() == ModelUnavailableException.Reason.OVERLOADED
+                ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.SERVICE_UNAVAILABLE;
+        return ResponseEntity.status(status)
+                .header(HttpHeaders.RETRY_AFTER, "5")
+                .body(ProblemDetail.forStatusAndDetail(status, "The assistant is busy or unavailable, try again shortly"));
     }
 
     @ExceptionHandler(Exception.class)

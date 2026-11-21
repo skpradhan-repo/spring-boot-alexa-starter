@@ -10,6 +10,7 @@ import com.amazon.ask.model.RequestEnvelope;
 import com.amazon.ask.servlet.verifiers.AlexaHttpRequest;
 import com.amazon.ask.servlet.verifiers.SkillServletVerifier;
 import com.ibm.rnd.alexa.config.AlexaProperties;
+import com.ibm.rnd.alexa.exception.SkillNotAuthorizedException;
 
 /**
  * Rejects requests addressed to a different skill than the one configured in
@@ -32,7 +33,7 @@ public class SkillIdVerifier implements SkillServletVerifier {
         }
         String actual = applicationId(request.getDeserializedRequestEnvelope()).orElse(null);
         if (!properties.skillId().equals(actual)) {
-            throw new SecurityException("Request is not addressed to the configured skill");
+            throw new SkillNotAuthorizedException("Request is not addressed to the configured skill");
         }
     }
 

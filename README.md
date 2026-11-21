@@ -1,5 +1,5 @@
 # spring-boot-alexa-starter
-A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **Amazon Alexa Skills Kit (ASK) Java SDK**, and a vanilla-JS browser UI. Test full Alexa `RequestEnvelope` lifecycles locally without an Echo device or AWS Lambda deployment.
+A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **Amazon Alexa Skills Kit (ASK) Java SDK**, and a vanilla-JS browser UI. Test full Alexa `RequestEnvelope` lifecycles locally without an Echo device or AWS Lambda deployment. It is evolving into a local, free-software AI assistant (Ollama, Spring AI, PostgreSQL + pgvector); see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Features
 * **Spring Boot webhook (`POST /alexa`):** parses raw Alexa JSON, validates and verifies it, then routes it through ASK `RequestHandler` beans.
@@ -10,10 +10,13 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
   * Voice start/stop (Web Speech API, Chrome or Edge) and optional spoken replies.
   * New session / clear conversation.
   * **Simple Mode** vs **Developer Mode** toggle (persisted in `localStorage`).
+* **Local chat model:** `POST /api/chat` and `POST /api/chat/stream` (Server-Sent Events) talk to Ollama through a resilient `ChatGateway` (concurrency limit, timeout, circuit breaker). The Alexa webhook never depends on the model.
 * **Secure by default:** signature, timestamp and skill-id verification are on unless the `local` profile is active. The server binds to `127.0.0.1`. User text is escaped in SSML, and clients only receive generic errors.
 
 ## Tech Stack
-* **Backend:** Java 17+, Spring Boot 4.1.2, ASK SDK 2.86.0 (`ask-sdk-core`, `ask-sdk-servlet-support`)
+* **Backend:** Java 21, Spring Boot 4.2.0, Spring AI 2.1.0, ASK SDK 2.86.0, Resilience4j 2.4.0, Micrometer + Prometheus
+* **Data:** PostgreSQL 16 + pgvector, Flyway migrations (knowledge profile)
+* **Models (local, via Ollama):** `gemma:2b` for chat, `bge-m3` for multilingual (English, Hindi, Odia) embeddings
 * **Frontend:** HTML5, CSS3, vanilla JavaScript (ES modules)
 
 ## Quick Start
@@ -31,6 +34,33 @@ A local end-to-end **Alexa Skill simulator** powered by **Spring Boot**, the **A
    ```
 
 Use the online `./mvnw`: an offline build (`-o`) fails unless the ASK servlet jar is already in the local Maven cache.
+
+## Local AI and database
+
+Ollama must be running natively (`ollama serve`) with the models pulled once:
+
+```bash
+ollama pull gemma:2b
+ollama pull bge-m3
+```
+
+Chat works with just that. Start the database only when you need the knowledge schema:
+
+```bash
+cp .env.example .env                 # then set POSTGRES_PASSWORD
+podman compose up -d postgres        # PostgreSQL + pgvector on 127.0.0.1:5432
+SPRING_PROFILES_ACTIVE=local,knowledge ./mvnw spring-boot:run   # Flyway creates the schema
+podman compose --profile observability up -d   # optional Prometheus + Grafana
+```
+
+Switch the chat model without code changes: `CHAT_MODEL=qwen3.5:9b`. On this CPU-only machine `gemma:2b` answers in about 1 s to first token, while a 9B model is far too slow for voice (measurements in [ARCHITECTURE.md](ARCHITECTURE.md)).
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/chat -H "Content-Type: application/json" -d '{"message":"What is a leave policy?"}'
+curl -N -X POST http://127.0.0.1:8080/api/chat/stream -H "Content-Type: application/json" -d '{"message":"Explain leave policy"}'
+```
+
+If Ollama is down, the Alexa intents keep working, chat returns `503` with `Retry-After`, and `/actuator/health` reports `DEGRADED`.
 
 ## Using the simulator
 
@@ -50,7 +80,9 @@ curl -X POST http://127.0.0.1:8080/alexa -H "Content-Type: application/json" -d 
 |---|---|
 | Valid Alexa request | `200` with the Alexa response JSON (speech, reprompt, card, directives, `sessionAttributes`) |
 | Malformed JSON, or missing `version`, `request.requestId`, or the intent name on an `IntentRequest` | `400` `ProblemDetail` with `"detail":"Invalid Alexa request"` |
-| Failed signature, timestamp or skill-id verification (`prod`) | `400` `ProblemDetail`; the cause is logged server-side only |
+| Failed signature or timestamp (`prod`) | `401` `ProblemDetail`; the cause is logged server-side only |
+| Request addressed to a different skill | `403` `ProblemDetail` |
+| Non-JSON content type | `415` |
 | Error inside a skill handler | `200` with a spoken apology from `GenericErrorHandler`; no internals are returned |
 | Any other server error | `500` `ProblemDetail` with `"detail":"Internal server error"` |
 
@@ -88,8 +120,14 @@ The UI lives in `src/main/resources/static/` (`app.js` is the shell; logic is in
 
 | Property | Default | Description |
 |---|---|---|
-| `alexa.skill-id` (`ALEXA_SKILL_ID`) | empty | Reject requests for other skills. Empty disables the check. |
+| `alexa.skill-id` (`ALEXA_SKILL_ID`) | empty | Reject requests for other skills. **Required while verification is enabled**: the app refuses to start without it. |
 | `alexa.verification.enabled` | `true` (`false` in `local`) | Enforce Alexa signature and timestamp verification. |
 | `alexa.verification.timestamp-tolerance` | `150s` | Maximum request age. |
+| `CHAT_MODEL` | `gemma:2b` | Ollama chat model. |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama endpoint. |
+| `assistant.gateway.max-concurrent` | `2` | Simultaneous model calls; more makes CPU inference slower. |
+| `assistant.gateway.queue-timeout` | `2s` | Wait for a free slot before answering `429`. |
+| `assistant.gateway.request-timeout` | `45s` | Hard limit per model call. |
+| `POSTGRES_PASSWORD` | none | Required by the `knowledge` profile and `compose.yaml`; keep it in `.env`. |
 
 For real Alexa traffic run with `SPRING_PROFILES_ACTIVE=prod` behind a TLS-terminating proxy, and set `ALEXA_SKILL_ID`.

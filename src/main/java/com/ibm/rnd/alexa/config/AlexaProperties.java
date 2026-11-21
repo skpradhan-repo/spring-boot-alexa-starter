@@ -4,17 +4,24 @@ import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 
 /**
- * Type-safe settings for the Alexa integration (prefix {@code alexa}).
+ * Type-safe settings for the Alexa integration (prefix {@code alexa}). Validated at startup: the
+ * application refuses to start with verification enabled but no skill id, instead of silently
+ * accepting requests addressed to any skill.
  *
- * @param skillId      expected skill (application) id; blank disables the check
+ * @param skillId      expected skill (application) id; may be blank only while verification is disabled
  * @param verification Alexa request verification settings
  */
+@Validated
 @ConfigurationProperties(prefix = "alexa")
 public record AlexaProperties(
         @DefaultValue("") String skillId,
-        @DefaultValue Verification verification) {
+        @Valid @DefaultValue Verification verification) {
 
     /**
      * @param enabled            whether signature and timestamp verification is enforced
@@ -33,5 +40,10 @@ public record AlexaProperties(
 
     public boolean hasSkillId() {
         return skillId != null && !skillId.isBlank();
+    }
+
+    @AssertTrue(message = "alexa.skill-id (ALEXA_SKILL_ID) must be set while alexa.verification.enabled=true")
+    public boolean isSkillIdConfiguredWhenVerifying() {
+        return !verification.enabled() || hasSkillId();
     }
 }

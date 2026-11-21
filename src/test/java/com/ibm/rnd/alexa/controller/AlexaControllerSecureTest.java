@@ -28,9 +28,15 @@ class AlexaControllerSecureTest {
     private MockMvc mvc;
 
     @Test
-    void unsignedRequestIsRejected() throws Exception {
+    void unsignedRequestIsRejectedAsUnauthenticated() throws Exception {
         mvc.perform(post("/alexa").contentType(MediaType.APPLICATION_JSON).content(UNSIGNED_REQUEST))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("Invalid Alexa request"));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Request could not be authenticated"));
+    }
+
+    @Test
+    void malformedJsonIsStillABadRequestBeforeAnyAuthentication() throws Exception {
+        mvc.perform(post("/alexa").contentType(MediaType.APPLICATION_JSON).content("{not json"))
+                .andExpect(status().isBadRequest());
     }
 }

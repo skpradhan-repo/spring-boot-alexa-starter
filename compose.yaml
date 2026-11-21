@@ -1,0 +1,63 @@
+name: alexa-assistant
+
+# Local infrastructure for the assistant. Ollama is NOT started here: it already runs natively on the host
+# (port 11434), which is faster on this machine than a container. Everything binds to loopback only.
+#
+#   cp .env.example .env        # then set POSTGRES_PASSWORD
+#   podman compose up -d        # PostgreSQL + pgvector
+#   podman compose --profile observability up -d   # adds Prometheus + Grafana
+
+services:
+  postgres:
+    # pgvector is not published on registry.redhat.io; the upstream image is pinned by tag and
+    # documented as an exception in docs/adr/0002-container-images.md.
+    image: docker.io/pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-assistant}
+      POSTGRES_USER: ${POSTGRES_USER:-assistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - assistant_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    shm_size: 256mb
+
+  prometheus:
+    profiles: ["observability"]
+    image: docker.io/prom/prometheus:v2.53.3
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - assistant_prometheus:/prometheus
+
+  grafana:
+    profiles: ["observability"]
+    image: docker.io/grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./ops/grafana-datasource.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - assistant_grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  assistant_pgdata:
+  assistant_prometheus:
+  assistant_grafana:
